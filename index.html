@@ -1,0 +1,1290 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1B4B2E" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0D2818" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>World Beer Passport</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.5.0/dist/libs/jsvectormap/dist/jsvectormap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.5.0/dist/libs/jsvectormap/dist/maps/world.js"></script>
+<!-- Firestore (Google's Firebase) — the free shared database this standalone
+     version syncs through. See the FIREBASE_CONFIG block near the top of the
+     page's main script for the one-time setup this needs. -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<style>
+  /* jsVectorMap's own stylesheet, inlined (artifacts can't load third-party
+     CSS from a <link>, only Google Fonts and scripts from approved CDNs —
+     the map's JS still loads fine from jsDelivr above, only its CSS needed
+     bringing in-house). Compiled from the library's own source, themed to
+     match this page instead of its blue default. */
+  .jvm-container{ position:relative; height:100%; width:100%; }
+  image, text, .jvm-zoom-btn{ user-select:none; }
+  .jvm-tooltip{
+    border-radius:5px;
+    background-color:#2B2015;
+    color:#FBF3E4;
+    font-size:13px;
+    box-shadow:0 2px 10px rgba(0,0,0,.3);
+    padding:5px 10px;
+    white-space:nowrap;
+    position:absolute;
+    display:none;
+  }
+  .jvm-tooltip.active{ display:block; }
+  .jvm-zoom-btn{
+    background-color:#8C4A14;
+    color:#fff;
+    border-radius:3px;
+    height:15px;
+    width:15px;
+    box-sizing:border-box;
+    position:absolute;
+    left:10px;
+    line-height:15px;
+    text-align:center;
+    cursor:pointer;
+  }
+  .jvm-zoom-btn.jvm-zoomin{ top:15px; }
+  .jvm-zoom-btn.jvm-zoomout{ top:40px; }
+</style>
+<style>
+  :root{
+    --paper:#EEEBD8;
+    --paper-dark:#E3DDBE;
+    --ink:#23261D;
+    --ink-soft:#565C46;
+    --amber:#B5651D;
+    --amber-deep:#8C4A14;
+    --gold:#C9A227;
+    --stamp:#2F5233;
+    --stamp-soft:#5C7A5F;
+    --stone:#D6DEC5;
+    --stone-dark:#B8C29D;
+    --card:#F9F8ED;
+    --danger:#9C3B2E;
+    --court-deep:#173B26;
+    --court-mid:#2E7D32;
+    --court-light:#8BC34A;
+    --ball:#D7E940;
+    --ball-ink:#1B3A1E;
+    --line:#F5F3EC;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+    box-sizing:border-box;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#1A1E14; --paper-dark:#12150D; --ink:#F1E7D3; --ink-soft:#C9B99C;
+      --amber:#E08A3E; --amber-deep:#C97A2E; --gold:#E0BE55; --stamp:#7FAE83;
+      /* --card was #232A1A — a dark green barely different from --paper's
+         #1A1E14, so cards disappeared into the page in dark mode. A brown
+         card didn't fit the palette either, so this stays green but a good
+         deal lighter, with a lighter green border to match, so cards still
+         read as distinct surfaces against the page. */
+      --stamp-soft:#5C7A5F; --stone:#2B3322; --stone-dark:#4F6B42; --card:#2C3B24;
+      --court-deep:#0B2314; --court-mid:#1E5A29; --court-light:#5C9438; --ball:#C7D93C; --line:#EDE8D8;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#1A1E14; --paper-dark:#12150D; --ink:#F1E7D3; --ink-soft:#C9B99C;
+    --amber:#E08A3E; --amber-deep:#C97A2E; --gold:#E0BE55; --stamp:#7FAE83;
+    --stamp-soft:#5C7A5F; --stone:#2B3322; --stone-dark:#4F6B42; --card:#2C3B24;
+    --court-deep:#0B2314; --court-mid:#1E5A29; --court-light:#5C9438; --ball:#C7D93C; --line:#EDE8D8;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  html{
+    scroll-padding-top:env(safe-area-inset-top,0px);
+    -webkit-text-size-adjust:100%;
+    text-size-adjust:100%;
+  }
+  html,body{overflow-x:hidden; max-width:100%;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    min-height:100%;
+    -webkit-font-smoothing:antialiased;
+    -webkit-tap-highlight-color:transparent;
+  }
+  button, [role="button"], .country-row{
+    touch-action:manipulation;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:0 20px 60px;}
+
+  header.cover{
+    background:linear-gradient(160deg,var(--court-deep),var(--court-mid) 58%,var(--court-light));
+    color:var(--line);
+    padding:34px 20px 44px;
+    position:relative;
+    overflow:hidden;
+    border-bottom:5px solid var(--line);
+    box-shadow:inset 0 -9px 0 -4px rgba(255,255,255,.35);
+  }
+  header.cover::before{
+    /* faint tennis-ball seam curves, echoing a court's service-line arcs */
+    content:"";
+    position:absolute; inset:0;
+    background-image:
+      radial-gradient(circle at 15% 20%, rgba(255,255,255,.10) 0, transparent 35%),
+      radial-gradient(circle at 85% 80%, rgba(0,0,0,.18) 0, transparent 40%);
+    pointer-events:none;
+  }
+  header.cover::after{
+    content:"";
+    position:absolute;
+    top:-55%; right:-10%;
+    width:380px; height:380px;
+    border:3px solid rgba(245,243,236,.16);
+    border-radius:50%;
+    pointer-events:none;
+  }
+  .cover-inner{max-width:1180px;margin:0 auto;position:relative;}
+  .kicker{
+    font-family:'Outfit',sans-serif;
+    font-style:normal;
+    font-weight:700;
+    font-size:13px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    opacity:.92;
+    margin:0 0 10px;
+    padding-bottom:8px;
+    border-bottom:2px dashed rgba(245,243,236,.45);
+    display:inline-block;
+  }
+  h1.title{
+    font-family:'Outfit',sans-serif;
+    font-weight:700;
+    font-size:clamp(34px,6vw,58px);
+    line-height:1.02;
+    margin:0 0 10px;
+    letter-spacing:-0.01em;
+  }
+  .title span.mug{display:inline-block;transform:translateY(2px);}
+  .lede{
+    max-width:52ch;
+    font-size:16.5px;
+    line-height:1.55;
+    opacity:.94;
+    margin:0;
+  }
+
+  .stats-row{
+    display:flex; flex-wrap:wrap; gap:14px;
+    margin-top:26px;
+  }
+  .stat-card{
+    background:rgba(245,243,236,.14);
+    border:1px dashed rgba(245,243,236,.45);
+    border-radius:4px;
+    padding:12px 18px;
+    min-width:150px;
+  }
+  .stat-num{font-family:'Outfit',sans-serif;font-weight:700;font-size:26px;line-height:1;}
+  .stat-label{font-size:12.5px;opacity:.85;margin-top:4px;}
+  .stat-card-link{cursor:pointer; transition:background .12s ease, transform .1s ease;}
+  .stat-card-link:hover{background:rgba(245,243,236,.24);}
+  .stat-card-link:active{transform:translateY(1px);}
+
+  .spin-btn{
+    margin-left:auto;
+    background:var(--ball);
+    color:var(--ball-ink);
+    border:2px solid rgba(27,58,30,.35);
+    font-family:'Outfit',sans-serif;
+    font-weight:700;
+    font-size:15px;
+    padding:12px 20px;
+    min-height:46px;
+    border-radius:999px;
+    cursor:pointer;
+    transition:transform .12s ease, box-shadow .12s ease;
+    box-shadow:0 3px 0 rgba(0,0,0,.25);
+  }
+  .spin-btn:hover{transform:translateY(-1px);}
+  .spin-btn:active{transform:translateY(1px); box-shadow:0 1px 0 rgba(0,0,0,.25);}
+
+  main{padding-top:30px;}
+
+  .toolbar{
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    margin-bottom:18px;
+  }
+  .view-toggle{
+    display:inline-flex; background:var(--stone); border-radius:999px; padding:3px;
+  }
+  .view-toggle button{
+    border:none; background:transparent; padding:10px 18px; border-radius:999px;
+    font-family:'Inter',sans-serif; font-weight:600; font-size:13.5px; color:var(--ink-soft);
+    cursor:pointer; min-height:40px;
+    transition:background .12s ease, color .12s ease, transform .1s ease;
+  }
+  /* A plain lighter panel color read as barely different from the toggle's
+     own track in dark mode — solid --stamp green with light text stands out
+     against any background, light or dark, the same way the "Stamped" pill
+     already does elsewhere on the page. */
+  .view-toggle button.active{
+    background:var(--stamp); color:#EFF6EE;
+    box-shadow:0 2px 6px rgba(0,0,0,.25);
+  }
+  .view-toggle button:not(.active):hover{background:rgba(0,0,0,.06); color:var(--ink);}
+  .search-input{
+    flex:1; min-width:180px; max-width:280px;
+    padding:9px 14px; border-radius:999px; border:1px solid var(--stone-dark);
+    background:var(--card); color:var(--ink); font-family:'Inter',sans-serif; font-size:16px;
+  }
+  .sync-note{
+    font-size:12.5px; color:var(--ink-soft); display:flex; align-items:center; gap:6px;
+  }
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--stamp-soft);display:inline-block;}
+  .dot.off{background:var(--danger);}
+
+  .layout{
+    display:grid; grid-template-columns:1.55fr 1fr; gap:22px; align-items:start;
+  }
+  @media (max-width:860px){
+    .layout{grid-template-columns:1fr;}
+    .panel{position:static;}
+  }
+  @media (max-width:640px){
+    .wrap{padding:0 14px 40px;}
+    header.cover{padding:24px 16px 32px;}
+    /* Smaller on phones so "World Beer Passport" and the mug emoji fit on one
+       line, and the lede reads at a size that doesn't push the map further
+       down the page than it needs to be. */
+    h1.title{font-size:28px;}
+    .lede{max-width:none; font-size:14.5px;}
+    .stat-card{min-width:0; flex:1 1 calc(50% - 7px); padding:10px 14px;}
+    .stat-num{font-size:22px;}
+    .spin-btn{flex:1 1 100%; margin-left:0;}
+    .panel{padding:18px;}
+    .panel-beer{font-size:24px;}
+  }
+
+  .map-card{
+    background:var(--card);
+    border:1px solid var(--stone-dark);
+    border-radius:8px;
+    padding:14px;
+  }
+  /* The bundled "world" map's own bounding box is 900 x 440.7 (confirmed from
+     its source data), so sizing the container to that same ratio means the
+     zoomed-out map fills it exactly — no leftover blank space above/below on
+     narrow (phone-width) screens where height:440px used to be too tall. */
+  #map{width:100%; aspect-ratio:900/440.7; height:auto; position:relative; padding:10px; box-sizing:border-box;}
+  /* jsVectorMap's zoom controls: nudge them to the top-right corner so they
+     never sit on top of the legend row underneath the map, sized to a
+     compact ~19px control, and recolored from the library's default brown
+     to the page's court green. .jvm-zoom-btn is the library's real class
+     (confirmed from its source); the attribute selector is a harmless
+     fallback in case a different build ever changes it. */
+  #map .jvm-zoom-btn, #map [class*="zoom"]{
+    top:8px !important;
+    bottom:auto !important;
+    left:auto !important;
+    right:8px !important;
+    width:19px !important;
+    height:19px !important;
+    line-height:19px !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    font-size:10px !important;
+    border-radius:4px !important;
+    background-color:var(--court-mid) !important;
+    box-shadow:0 1px 4px rgba(0,0,0,.25);
+  }
+  #map .jvm-zoom-btn.jvm-zoomout, #map [class*="zoomout"]{ top:30px !important; }
+  .map-legend{display:flex; gap:18px; font-size:12.5px; color:var(--ink-soft); margin-top:10px; padding:0 6px; flex-wrap:wrap;}
+  .legend-swatch{width:11px;height:11px;border-radius:2px;display:inline-block;margin-right:5px;vertical-align:-1px;}
+
+  .panel{
+    background:var(--card);
+    border:1px solid var(--stone-dark);
+    border-radius:8px;
+    padding:22px;
+    min-height:440px;
+    position:sticky; top:16px;
+  }
+  .panel-empty{
+    display:flex; flex-direction:column; align-items:flex-start; justify-content:center;
+    height:100%; min-height:396px; color:var(--ink-soft);
+  }
+  .panel-empty .big{font-family:'Outfit',sans-serif; font-size:22px; color:var(--ink); margin-bottom:8px;}
+  .panel-flag{font-size:40px; line-height:1;}
+  .panel-country{font-family:'Outfit',sans-serif; font-weight:700; font-size:15px; letter-spacing:.02em; color:var(--ink-soft); margin:10px 0 2px; text-transform:uppercase;}
+  .panel-beer{font-family:'Outfit',sans-serif; font-weight:700; font-size:30px; line-height:1.08; margin:0 0 6px;}
+  .panel-meta{font-size:14px; color:var(--ink-soft); margin-bottom:14px;}
+  .panel-note{font-size:14.5px; line-height:1.55; margin-bottom:18px;}
+
+  .stamp-btn{
+    display:inline-flex; align-items:center; gap:9px;
+    font-family:'Outfit',sans-serif; font-weight:600; font-size:15px;
+    padding:11px 18px; border-radius:5px; border:2px solid var(--stamp);
+    background:transparent; color:var(--stamp); cursor:pointer; min-height:46px;
+    transition:background .15s ease, color .15s ease, transform .1s ease;
+  }
+  .stamp-btn.tried{background:var(--stamp); color:#EFF6EE;}
+  .stamp-btn:active{transform:scale(.97);}
+  @keyframes stampin{
+    0%{transform:scale(2.4) rotate(-14deg); opacity:0;}
+    60%{transform:scale(.92) rotate(-14deg); opacity:1;}
+    100%{transform:scale(1) rotate(-14deg); opacity:1;}
+  }
+  .stamp-pop{
+    position:absolute; font-family:'Outfit',sans-serif; font-weight:700; font-size:13px;
+    color:var(--stamp); border:3px solid var(--stamp); border-radius:6px; padding:4px 10px;
+    transform:rotate(-14deg); text-transform:uppercase; letter-spacing:.06em;
+    animation:stampin .5s ease-out; pointer-events:none;
+  }
+
+  .save-note{
+    margin-top:8px; font-size:13px; padding:10px 14px; border-radius:5px; border:1px solid var(--stamp); min-height:42px;
+    background:transparent; color:var(--stamp); cursor:pointer; font-family:'Inter',sans-serif; font-weight:600;
+  }
+
+  .custom-form{margin-top:14px; padding-top:14px; border-top:1px dashed var(--stone-dark);}
+  .custom-form label{font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft); display:block; margin-bottom:5px;}
+  .custom-form input{
+    width:100%; padding:10px 11px; border-radius:5px; border:1px solid var(--stone-dark);
+    background:var(--paper); color:var(--ink); font-family:'Inter',sans-serif; font-size:16px; margin-bottom:10px;
+  }
+  .custom-form .save-note{background:var(--stamp); color:#EFF6EE;}
+
+  .weekly-pick{
+    background:var(--stone); border-radius:8px; padding:16px 18px; font-size:14px;
+  }
+  #weekly-banner{ margin-bottom:18px; }
+  .panel .weekly-pick{ margin-top:22px; }
+  .weekly-pick .wp-label{font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); margin-bottom:4px;}
+  .weekly-pick .wp-beer{font-family:'Outfit',sans-serif; font-weight:700; font-size:18px;}
+  .weekly-pick{display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;}
+  .wp-cancel{
+    background:transparent; border:1px solid var(--ink-soft); color:var(--ink-soft);
+    font-family:'Inter',sans-serif; font-weight:600; font-size:12.5px;
+    padding:8px 14px; border-radius:999px; cursor:pointer; min-height:38px; flex:none;
+  }
+  .wp-cancel:hover{border-color:var(--danger); color:var(--danger);}
+
+  .roster-card{
+    background:var(--card); border:1px solid var(--stone-dark); border-radius:8px;
+    padding:16px 18px; margin-bottom:18px;
+  }
+  .roster-card h4{
+    font-family:'Inter',sans-serif; font-size:12px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--ink-soft); margin:0 0 10px;
+  }
+  .roster-display{display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;}
+  .roster-info .rd-date{font-family:'Outfit',sans-serif; font-weight:700; font-size:17px;}
+  .roster-info .rd-names{font-size:14px; color:var(--ink-soft); margin-top:2px;}
+  .rd-beer{font-style:italic;}
+  .roster-history-heading{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    font-family:'Inter',sans-serif; font-size:12px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--ink-soft); margin:4px 2px 10px;
+  }
+  .roster-add-btn{
+    background:transparent; border:1px solid var(--stamp); color:var(--stamp);
+    font-family:'Inter',sans-serif; font-weight:600; font-size:12.5px;
+    text-transform:none; letter-spacing:normal;
+    padding:7px 14px; border-radius:999px; cursor:pointer; min-height:36px; flex:none;
+  }
+  .roster-add-btn:hover{background:var(--stamp); color:#EFF6EE;}
+  .roster-save-warning{
+    background:rgba(156,59,46,.12); border:1px solid var(--danger); color:var(--danger);
+    font-size:13px; padding:9px 13px; border-radius:5px; margin-bottom:10px;
+  }
+  .roster-form{display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;}
+  .roster-form .rf-field{display:flex; flex-direction:column; gap:5px;}
+  .roster-form label{font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft);}
+  .roster-form input{
+    padding:9px 11px; border-radius:5px; border:1px solid var(--stone-dark);
+    background:var(--paper); color:var(--ink); font-family:'Inter',sans-serif; font-size:16px; min-height:40px;
+  }
+  .roster-form-actions{display:flex; gap:8px;}
+  @media (max-width:640px){
+    .roster-form{flex-direction:column; align-items:stretch;}
+    .roster-form .rf-field{width:100%;}
+  }
+
+  .list-view{display:none; margin-top:6px;}
+  .list-view.active{display:block;}
+  .country-row{
+    display:flex; align-items:center; gap:14px; padding:12px 14px; border-radius:6px;
+    background:var(--card); border:1px solid var(--stone-dark); margin-bottom:8px; cursor:pointer;
+    transition:border-color .12s ease;
+  }
+  .country-row:hover{border-color:var(--court-mid);}
+  .country-row .flag{font-size:24px;}
+  .country-row .names{flex:1; min-width:0;}
+  .country-row .cname{font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-soft);}
+  .country-row .bname{font-family:'Outfit',sans-serif; font-weight:600; font-size:16px;}
+  .country-row .cb{width:24px; height:24px; border-radius:50%; border:2px solid var(--stamp); flex:none; display:flex; align-items:center; justify-content:center; color:var(--stamp); font-size:13px; background:transparent;}
+  .country-row.tried .cb{background:var(--stamp); color:#EFF6EE;}
+  .map-view{display:block;}
+  .map-view.hidden{display:none;}
+  .history-row{
+    display:flex; align-items:center; justify-content:space-between; gap:14px; padding:12px 14px;
+    border-radius:6px; background:var(--card); border:1px solid var(--stone-dark); margin-bottom:8px;
+  }
+  .history-row .hr-date{font-family:'Outfit',sans-serif; font-weight:700; font-size:15px;}
+  .history-row .hr-names{font-size:13.5px; color:var(--ink-soft); margin-top:4px;}
+  .history-row .hr-name-line{margin-top:2px;}
+  .history-row .hr-name-line:first-child{margin-top:0;}
+  .history-row.history-row-editing{display:block;}
+
+  footer{max-width:1180px; margin:40px auto 0; padding:0 20px; font-size:12.5px; color:var(--ink-soft); text-align:center;}
+
+  ::selection{background:var(--gold); color:#2B2015;}
+  a{color:inherit;}
+</style>
+</head>
+<body>
+
+<header class="cover">
+  <div class="cover-inner">
+    <p class="kicker">Terrigal Gents Tennis</p>
+    <h1 class="title">World Beer Passport <span class="mug">🍺</span></h1>
+    <p class="lede">Click any country to see its signature beer, then stamp it for the group — let's see how many countries we can sample.</p>
+    <div class="stats-row">
+      <div class="stat-card stat-card-link" id="stat-tried-card" role="button" tabindex="0"><div class="stat-num" id="stat-tried">0</div><div class="stat-label">Countries stamped</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-total">—</div><div class="stat-label">Beers on the map</div></div>
+      <button class="spin-btn" id="spin-btn" type="button">🎾 Randomly pick this week's beer</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+<main>
+  <div class="toolbar">
+    <div class="view-toggle">
+      <button id="tab-map" class="active" type="button">Map</button>
+      <button id="tab-list" type="button">List</button>
+      <button id="tab-roster" type="button">Roster</button>
+    </div>
+    <input class="search-input" id="search-input" type="text" placeholder="Find a country or beer…" style="display:none;">
+    <span class="sync-note"><span class="dot off" id="sync-dot"></span><span id="sync-text">Connecting…</span></span>
+  </div>
+
+  <div class="weekly-pick" id="weekly-banner" style="display:none;"></div>
+
+  <div class="layout">
+    <div>
+      <div class="map-card map-view" id="map-view">
+        <div id="map"></div>
+        <div class="map-legend">
+          <span><span class="legend-swatch" style="background:#2F5233"></span>Stamped</span>
+          <span><span class="legend-swatch" style="background:#C9A227"></span>Weekly pick</span>
+          <span><span class="legend-swatch" style="background:#D9CFBC"></span>Not yet tried</span>
+        </div>
+      </div>
+      <div class="list-view" id="list-view"></div>
+      <div class="list-view" id="roster-view"></div>
+    </div>
+
+    <div class="panel" id="panel">
+      <div class="panel-empty">
+        <div class="panel-flag">🗺️</div>
+        <div class="big">Pick a country</div>
+        <div>Click anywhere on the map — or hit the dice above — to see what's brewing there.</div>
+      </div>
+    </div>
+  </div>
+</main>
+</div>
+
+<footer></footer>
+
+<script>
+(function(){
+  "use strict";
+
+  // Mobile browsers restore the scroll position you were at when you
+  // refresh, so a page reload after tapping a country used to land halfway
+  // down instead of at the top. This page starts fresh each load, so it
+  // opts out of that restoration and pins the load to the very top.
+  if('scrollRestoration' in history){ history.scrollRestoration = 'manual'; }
+  window.scrollTo(0,0);
+
+  // ============================================================
+  // ONE-TIME SETUP — paste in your own free Firebase project's config.
+  // This is what makes the passport sync for everyone who opens this page,
+  // with no login for anyone: there's no per-user identity at all here,
+  // just one shared board everyone reads and writes together.
+  //
+  // 1. Go to https://console.firebase.google.com, create a project (free).
+  // 2. In the project, add a "Web app" (</> icon) — it shows you the config
+  //    object below; copy its values in here.
+  // 3. In the project, open Firestore Database > Create database (any
+  //    region, "production mode" is fine — the rules below override it).
+  // 4. In Firestore's Rules tab, replace the rules with:
+  //
+  //      rules_version = '2';
+  //      service cloud.firestore {
+  //        match /databases/{database}/documents {
+  //          match /passport/state {
+  //            allow read, write: if true;
+  //          }
+  //        }
+  //      }
+  //
+  //    That's what makes it work with no login — anyone who has this page
+  //    can read and write the shared data. There's no access control beyond
+  //    "has the link", so treat it the same way you'd treat a shared doc
+  //    link: fine for a small group of friends, not for anything sensitive.
+  // 5. Host this HTML file anywhere (GitHub Pages, Netlify, etc.) and share
+  //    that link with the group instead of this Firebase console.
+  // ============================================================
+  var FIREBASE_CONFIG = {
+	  apiKey: "AIzaSyC_g1UPvCkL29T6B5xucAVnPwEDM5Cp_jU",
+	  authDomain: "terrigal-gents-tennis.firebaseapp.com",
+	  projectId: "terrigal-gents-tennis",
+	  storageBucket: "terrigal-gents-tennis.firebasestorage.app",
+	  messagingSenderId: "551610067830",
+	  appId: "1:551610067830:web:0c9c90e903c9bc157e6857"
+  };
+
+  // ---------- Beer data (curated) ----------
+  var BEERS = {
+    US:{c:"United States",b:"Budweiser",s:"American Lager",br:"Anheuser-Busch",n:"The self-styled \u201cKing of Beers,\u201d brewed since 1876 and still the beer most Americans picture first."},
+    CA:{c:"Canada",b:"Labatt Blue",s:"Pale Lager",br:"Labatt",n:"A crisp, mild lager that's been a hockey-game staple since 1951."},
+    MX:{c:"Mexico",b:"Corona",s:"Pale Lager",br:"Grupo Modelo",n:"The lime wedge is optional, the export success is not \u2014 one of the best-selling beers on earth."},
+    BR:{c:"Brazil",b:"Brahma",s:"Pale Lager",br:"Ambev",n:"Founded in 1888, Brahma practically defines the Brazilian bar fridge."},
+    AR:{c:"Argentina",b:"Quilmes",s:"Pale Lager",br:"Quilmes",n:"Named after the town where it was first brewed in 1888; unofficial soundtrack to every asado."},
+    CL:{c:"Chile",b:"Cristal",s:"Pale Lager",br:"CCU",n:"Chile's best-seller since 1904, usually served ice-cold."},
+    CO:{c:"Colombia",b:"\u00c1guila",s:"Pale Lager",br:"Bavaria",n:"Light, golden, and named for the eagle on its label \u2014 Colombia's top-selling lager."},
+    PE:{c:"Peru",b:"Cristal",s:"Pale Lager",br:"Backus",n:"Peru's most popular beer, distinct from its Chilean namesake."},
+    VE:{c:"Venezuela",b:"Polar",s:"Pale Lager",br:"Empresas Polar",n:"So dominant that \u201cuna Polar\u201d is practically a synonym for beer in Venezuela."},
+    EC:{c:"Ecuador",b:"Pilsener",s:"Pale Lager",br:"Cervecer\u00eda Nacional",n:"A green-labeled staple since 1913, brewed in Guayaquil."},
+    BO:{c:"Bolivia",b:"Pace\u00f1a",s:"Pale Lager",br:"CBN",n:"Named for La Paz, this light lager is Bolivia's most recognized brand."},
+    PY:{c:"Paraguay",b:"Pilsen",s:"Pale Lager",br:"Cerveceria Paraguaya",n:"A light, easy-drinking lager that dominates Paraguayan asados."},
+    UY:{c:"Uruguay",b:"Pilsen",s:"Pale Lager",br:"FNC",n:"Uruguay's everyday lager, poured ice-cold at every parrilla."},
+    CU:{c:"Cuba",b:"Cristal",s:"Pale Lager",br:"Cervecer\u00eda Bucanero",n:"Cuba's lighter, more sessionable answer to its bolder cousin Bucanero."},
+    DO:{c:"Dominican Republic",b:"Presidente",s:"Pale Lager",br:"Cerveceria Nacional Dominicana",n:"Brewed since 1935, and about as close to a national symbol as a beer gets."},
+    JM:{c:"Jamaica",b:"Red Stripe",s:"Lager",br:"Desnoes & Geddes",n:"Brewed in Kingston since 1928 \u2014 \u201cHooray Beer!\u201d as the old slogan went."},
+    TT:{c:"Trinidad and Tobago",b:"Carib",s:"Pale Lager",br:"Carib Brewery",n:"The Caribbean's biggest brewery, headquartered in Trinidad since 1950."},
+    PA:{c:"Panama",b:"Balboa",s:"Pale Lager",br:"Cerveceria Nacional",n:"Named after the explorer, and Panama's classic beach lager."},
+    CR:{c:"Costa Rica",b:"Imperial",s:"Pale Lager",br:"Florida Ice & Farm",n:"That eagle logo is practically a national emblem in its own right."},
+    GT:{c:"Guatemala",b:"Gallo",s:"Pale Lager",br:"Cerveceria Centro Americana",n:"\u201cLa cerveza de Guatemala\u201d since 1896, named for the rooster on its label."},
+    HN:{c:"Honduras",b:"Salva Vida",s:"Pale Lager",br:"Cerveceria Hondure\u00f1a",n:"The name means \u201clifesaver\u201d \u2014 Honduras's most popular beer."},
+    SV:{c:"El Salvador",b:"Pilsener",s:"Pale Lager",br:"Industrias La Constancia",n:"A light, refreshing lager that's been El Salvador's default order for decades."},
+    NI:{c:"Nicaragua",b:"To\u00f1a",s:"Pale Lager",br:"Cerveceria de Nicaragua",n:"Nicaragua's homegrown favorite, named after a legendary local horse."},
+    PR:{c:"Puerto Rico",b:"Medalla",s:"Pale Lager",br:"Cervecer\u00eda India",n:"Light, gold, and inseparable from a Puerto Rican beach day."},
+
+    GB:{c:"United Kingdom",b:"Carling",s:"Lager",br:"Molson Coors",n:"Britain's best-selling lager by volume, a fixture of pub taps nationwide."},
+    IE:{c:"Ireland",b:"Guinness",s:"Dry Stout",br:"Guinness",n:"Brewed at St. James's Gate since 1759 \u2014 the pour itself is basically a ritual."},
+    DE:{c:"Germany",b:"Beck's",s:"Pilsner",br:"Beck's Brewery",n:"Brewed in Bremen since 1873, and one of Germany's best-known beer exports."},
+    BE:{c:"Belgium",b:"Stella Artois",s:"Pilsner",br:"AB InBev",n:"Brewed in Leuven since 1926, and Belgium's biggest global beer export."},
+    NL:{c:"Netherlands",b:"Heineken",s:"Pale Lager",br:"Heineken",n:"That red star has been on Dutch beer since 1873, now sold in over 190 countries."},
+    FR:{c:"France",b:"Kronenbourg 1664",s:"Pale Lager",br:"Kronenbourg",n:"Alsace-brewed since 1664, and France's most exported beer."},
+    ES:{c:"Spain",b:"Mahou",s:"Pale Lager",br:"Mahou-San Miguel",n:"A Madrid institution since 1890, and Spain's best-selling beer."},
+    PT:{c:"Portugal",b:"Super Bock",s:"Pale Lager",br:"Super Bock Group",n:"The stag's-head logo is everywhere \u2014 Portugal's favorite round."},
+    IT:{c:"Italy",b:"Peroni",s:"Pale Lager",br:"Asahi (Peroni)",n:"Crisp, blue-labeled, and Italy's most recognizable beer since 1846."},
+    DK:{c:"Denmark",b:"Carlsberg",s:"Pale Lager",br:"Carlsberg",n:"\u201cProbably the best beer in the world\u201d since 1847, brewed in Copenhagen."},
+    SE:{c:"Sweden",b:"Norrlands Guld",s:"Lager",br:"Carlsberg Sverige",n:"A golden lager from the north that's Sweden's top-selling beer."},
+    NO:{c:"Norway",b:"Ringnes",s:"Pale Lager",br:"Ringnes",n:"Oslo's own since 1876, and Norway's most familiar beer label."},
+    FI:{c:"Finland",b:"Karhu",s:"Lager",br:"Sinebrychoff",n:"\u201cKarhu\u201d means bear \u2014 Finland's iconic, easy-drinking lager."},
+    IS:{c:"Iceland",b:"Vi\u00f0king Gylltur",s:"Lager",br:"\u00d6lger\u00f0in Egill Skallagr\u00edmsson",n:"A staple since beer was legalized in Iceland in 1989."},
+    PL:{c:"Poland",b:"Tyskie",s:"Pale Lager",br:"Kompania Piwowarska",n:"Brewed in Tychy since 1629, and Poland's best-selling beer today."},
+    CZ:{c:"Czechia",b:"Pilsner Urquell",s:"Pilsner",br:"Pilsner Urquell",n:"The original pilsner, brewed in Plze\u0148 since 1842 \u2014 every golden lager traces back here."},
+    AT:{c:"Austria",b:"Stiegl",s:"Lager",br:"Stieglbrauerei",n:"Salzburg's own since 1492, and Austria's largest independent brewery."},
+    CH:{c:"Switzerland",b:"Feldschl\u00f6sschen",s:"Lager",br:"Feldschl\u00f6sschen",n:"Brewed since 1876, with the country's most recognizable beer castle on the label."},
+    RU:{c:"Russia",b:"Baltika",s:"Pale Lager",br:"Baltika Breweries",n:"Founded in 1990 in St. Petersburg, now Russia's dominant brewer."},
+    UA:{c:"Ukraine",b:"Obolon",s:"Pale Lager",br:"Obolon",n:"Kyiv's own since 1980, and one of Ukraine's most familiar labels."},
+    RO:{c:"Romania",b:"Ursus",s:"Pale Lager",br:"Ursus Breweries",n:"\u201cUrsus\u201d means bear \u2014 brewed in Cluj since 1878 and Romania's top seller."},
+    BG:{c:"Bulgaria",b:"Kamenitza",s:"Pale Lager",br:"Kamenitza AD",n:"Brewed in Plovdiv since 1881, a Bulgarian household name."},
+    GR:{c:"Greece",b:"Mythos",s:"Pale Lager",br:"Olympic Brewery",n:"Launched in 1997 and quickly became the taverna default."},
+    HU:{c:"Hungary",b:"Dreher",s:"Lager",br:"Dreher",n:"A Hungarian brewing name dating back to the 1800s."},
+    HR:{c:"Croatia",b:"O\u017eujsko",s:"Pale Lager",br:"Zagreba\u010dka Pivovara",n:"Named for the month of its 1892 launch \u2014 O\u017eujsko is Croatia's favorite."},
+    RS:{c:"Serbia",b:"Jelen",s:"Pale Lager",br:"Apatinska Pivara",n:"\u201cJelen\u201d means deer \u2014 Serbia's best-selling beer brand."},
+    SK:{c:"Slovakia",b:"Zlat\u00fd Ba\u017eant",s:"Pale Lager",br:"Heineken Slovensko",n:"\u201cGolden Pheasant,\u201d brewed in Hurbanovo since 1969."},
+    SI:{c:"Slovenia",b:"Uni\u00f3n",s:"Pilsner",br:"Pivovarna Uni\u00f3n",n:"Ljubljana's own since 1864, still brewed at the same site."},
+    LT:{c:"Lithuania",b:"\u0160vyturys",s:"Pale Lager",br:"\u0160vyturys-Utenos Alus",n:"Brewed in the port city of Klaip\u0117da since 1784."},
+    LV:{c:"Latvia",b:"Aldaris",s:"Pale Lager",br:"Aldaris",n:"Riga's historic brewery, pouring since 1865."},
+    EE:{c:"Estonia",b:"Saku",s:"Pale Lager",br:"Saku \u00d5lletehas",n:"Estonia's biggest brewer, based just outside Tallinn since 1820."},
+    LU:{c:"Luxembourg",b:"Bofferding",s:"Pale Lager",br:"Brasserie Nationale",n:"Family-brewed in Bascharage since 1764."},
+    MT:{c:"Malta",b:"Cisk",s:"Pale Lager",br:"Farsons",n:"Named after a WWI brewer, Cisk Lager is Malta's national drink."},
+    CY:{c:"Cyprus",b:"Keo",s:"Pale Lager",br:"Keo Ltd",n:"Brewed in Limassol since 1951, and Cyprus's best-known label."},
+    TR:{c:"T\u00fcrkiye",b:"Efes Pilsen",s:"Pilsner",br:"Anadolu Efes",n:"Named after the ancient city of Ephesus; T\u00fcrkiye's top-selling beer."},
+
+    ZA:{c:"South Africa",b:"Castle Lager",s:"Pale Lager",br:"SAB",n:"Brewed since 1895, and still the beer most South Africans call \u201ca castle.\u201d"},
+    NG:{c:"Nigeria",b:"Star Lager",s:"Pale Lager",br:"Nigerian Breweries",n:"West Africa's oldest brewed beer, pouring since 1949."},
+    KE:{c:"Kenya",b:"Tusker",s:"Pale Lager",br:"East African Breweries",n:"Named for an elephant that killed the brewery's co-founder \u2014 now Kenya's icon."},
+    ET:{c:"Ethiopia",b:"St. George",s:"Pale Lager",br:"BGI Ethiopia",n:"Ethiopia's oldest brewery, brewing since 1922 and named for the country's patron saint."},
+    GH:{c:"Ghana",b:"Club Beer",s:"Pale Lager",br:"Accra Brewery",n:"Ghana's original lager, brewed since 1931."},
+    TZ:{c:"Tanzania",b:"Safari Lager",s:"Pale Lager",br:"Tanzania Breweries",n:"A crisp everyday lager and one of Tanzania's most familiar labels."},
+    UG:{c:"Uganda",b:"Nile Special",s:"Pale Lager",br:"Nile Breweries",n:"Brewed on the banks of the Nile since 1954 and a Ugandan point of pride."},
+    ZM:{c:"Zambia",b:"Mosi",s:"Pale Lager",br:"Zambian Breweries",n:"Named after Mosi-oa-Tunya (Victoria Falls) \u2014 Zambia's favorite."},
+    ZW:{c:"Zimbabwe",b:"Zambezi",s:"Pale Lager",br:"Delta Beverages",n:"Named for the river, and Zimbabwe's leading clear lager."},
+    NA:{c:"Namibia",b:"Windhoek Lager",s:"Pale Lager",br:"Namibia Breweries",n:"Brewed to German purity standards \u2014 a lasting legacy of Namibia's colonial history."},
+    CM:{c:"Cameroon",b:"33 Export",s:"Pale Lager",br:"Soci\u00e9t\u00e9 des Brasseries du Cameroun",n:"Cameroon's most popular beer, sold since the 1950s."},
+    SN:{c:"Senegal",b:"Gazelle",s:"Pale Lager",br:"Brasseries de l'Ouest Africain",n:"A light lager that's been Senegal's go-to since the 1930s."},
+    CI:{c:"C\u00f4te d'Ivoire",b:"Flag",s:"Pale Lager",br:"Brassivoire",n:"A long-running Ivorian favorite found in nearly every maquis."},
+    MA:{c:"Morocco",b:"Casablanca",s:"Pale Lager",br:"Soci\u00e9t\u00e9 des Brasseries du Maroc",n:"Named after the city, and Morocco's most recognized local beer."},
+    EG:{c:"Egypt",b:"Stella",s:"Pale Lager",br:"Al Ahram Beverages",n:"Brewed since 1897 \u2014 no relation to the Belgian Stella, but just as beloved locally."},
+    RW:{c:"Rwanda",b:"Primus",s:"Pale Lager",br:"Bralirwa",n:"Rwanda's original lager, brewed since 1959."},
+    MZ:{c:"Mozambique",b:"2M",s:"Pale Lager",br:"Cervejas de Mo\u00e7ambique",n:"The single most recognized beer brand in Mozambique."},
+    BW:{c:"Botswana",b:"St. Louis Lager",s:"Pale Lager",br:"Kgalagadi Breweries",n:"Botswana's homegrown lager, brewed in Gaborone."},
+
+    CN:{c:"China",b:"Tsingtao",s:"Pale Lager",br:"Tsingtao Brewery",n:"Brewed since 1903 in a former German concession \u2014 China's most exported beer."},
+    JP:{c:"Japan",b:"Asahi Super Dry",s:"Dry Lager",br:"Asahi Breweries",n:"The 1987 launch that invented the crisp \u201ckarakuchi\u201d dry-beer category."},
+    KR:{c:"South Korea",b:"Cass",s:"Pale Lager",br:"Oriental Brewery",n:"South Korea's current best-seller, a light, fizzy soju-and-beer bar staple."},
+    IN:{c:"India",b:"Kingfisher",s:"Pale Lager",br:"United Breweries",n:"\u201cThe king of good times\u201d since 1978 \u2014 India's most exported beer."},
+    TH:{c:"Thailand",b:"Chang",s:"Pale Lager",br:"ThaiBev",n:"\u201cElephant\u201d beer, Thailand's best-selling brand by volume since 1995."},
+    VN:{c:"Vietnam",b:"Bia Sa\u00ecg\u00f2n",s:"Pale Lager",br:"Sabeco",n:"Vietnam's most-consumed beer, poured over ice in bia h\u01a1i corners nationwide."},
+    PH:{c:"Philippines",b:"San Miguel Pale Pilsen",s:"Pilsner",br:"San Miguel Corporation",n:"Brewed since 1890, and one of Southeast Asia's most exported beers."},
+    ID:{c:"Indonesia",b:"Bintang",s:"Pale Lager",br:"Multi Bintang",n:"\u201cStar\u201d beer, brewed since 1929 and Indonesia's most recognized label."},
+    MY:{c:"Malaysia",b:"Tiger Beer",s:"Pale Lager",br:"Heineken Malaysia",n:"Brewed since 1932, and one of Southeast Asia's most iconic exports."},
+    SG:{c:"Singapore",b:"Tiger Beer",s:"Pale Lager",br:"Asia Pacific Breweries",n:"Singapore's most famous beer export, brewed since 1932."},
+    LA:{c:"Laos",b:"Beerlao",s:"Pale Lager",br:"Lao Brewery Company",n:"Made with local jasmine rice, and a point of national pride."},
+    KH:{c:"Cambodia",b:"Angkor Beer",s:"Pale Lager",br:"Cambrew",n:"Named for the temples, and Cambodia's most popular local beer."},
+    MM:{c:"Myanmar",b:"Myanmar Beer",s:"Pale Lager",br:"Myanmar Brewery",n:"Brewed in Yangon since 1995, and the country's leading lager."},
+    NP:{c:"Nepal",b:"Everest",s:"Pale Lager",br:"Gorkha Brewery",n:"Named for the mountain \u2014 a familiar sight in Kathmandu bars."},
+    LK:{c:"Sri Lanka",b:"Lion Lager",s:"Pale Lager",br:"Lion Brewery",n:"Brewed since 1881 and Sri Lanka's most established beer."},
+    MN:{c:"Mongolia",b:"Chinggis",s:"Pale Lager",br:"APU Company",n:"Named for Genghis Khan, and Mongolia's flagship beer."},
+    KZ:{c:"Kazakhstan",b:"Derbes",s:"Pale Lager",br:"Efes Kazakhstan",n:"One of Kazakhstan's most widely poured local lagers."},
+    IL:{c:"Israel",b:"Goldstar",s:"Amber Lager",br:"Tempo Beer Industries",n:"A slightly darker, maltier lager that's been an Israeli favorite since 1954."},
+    PK:{c:"Pakistan",b:"Murree",s:"Lager",br:"Murree Brewery",n:"Founded in 1860, one of the oldest breweries in Asia, still brewing today."},
+
+    AU:{c:"Australia",b:"Victoria Bitter",s:"Lager",br:"Carlton & United Breweries",n:"\u201cVB\u201d has been Australia's default counter beer since 1854."},
+    NZ:{c:"New Zealand",b:"Steinlager",s:"Lager",br:"Lion",n:"New Zealand's best-known international export since 1957."},
+    FJ:{c:"Fiji",b:"Fiji Bitter",s:"Lager",br:"Carlton Brewery Fiji",n:"Brewed in Suva, and the beer most associated with a Fijian night out."},
+    PG:{c:"Papua New Guinea",b:"SP Lager",s:"Pale Lager",br:"South Pacific Brewery",n:"Brewed since 1952 and universally known simply as \u201cSP.\u201d"}
+  };
+
+  var TOTAL_CURATED = Object.keys(BEERS).length;
+  document.getElementById('stat-total').textContent = TOTAL_CURATED + '+';
+
+  // A single representative color per flag, used as a subtle tint behind
+  // ticked-off beers in the list view. Approximate on purpose (one color
+  // can't capture a whole flag) — picked for recognizability, not precision.
+  var FLAG_COLORS = {
+    US:'#3C3B6E', CA:'#FF0000', MX:'#006341', BR:'#009739', AR:'#74ACDF', CL:'#0039A6',
+    CO:'#FCD116', PE:'#D91023', VE:'#FFCC00', EC:'#FFDD00', BO:'#D52B1E', PY:'#0038A8',
+    UY:'#0038A8', CU:'#002A8F', DO:'#002D62', JM:'#009B3A', TT:'#DA1212', PA:'#DA121A',
+    CR:'#002B7F', GT:'#4997D0', HN:'#0073CF', SV:'#0047AB', NI:'#0067C6', PR:'#0050F0',
+    GB:'#00247D', IE:'#169B62', DE:'#FFCE00', BE:'#FDDA24', NL:'#AE1C28', FR:'#0055A4',
+    ES:'#AA151B', PT:'#006600', IT:'#008C45', DK:'#C60C30', SE:'#006AA7', NO:'#BA0C2F',
+    FI:'#003580', IS:'#02529C', PL:'#DC143C', CZ:'#11457E', AT:'#ED2939', CH:'#FF0000',
+    RU:'#0039A6', UA:'#0057B7', RO:'#002B7F', BG:'#00966E', GR:'#0D5EAF', HU:'#CE2939',
+    HR:'#FF0000', RS:'#C6363C', SK:'#0B4EA2', SI:'#005DA4', LT:'#FDB913', LV:'#9E3039',
+    EE:'#0072CE', LU:'#00A1DE', MT:'#CF142B', CY:'#D57800', TR:'#E30A17',
+    ZA:'#007A4D', NG:'#008751', KE:'#006600', ET:'#078930', GH:'#006B3F', TZ:'#1EB53A',
+    UG:'#FCDC04', ZM:'#198A00', ZW:'#006400', NA:'#003580', CM:'#007A5E', SN:'#00853F',
+    CI:'#F77F00', MA:'#C1272D', EG:'#CE1126', RW:'#00A1DE', MZ:'#007168', BW:'#75AADB',
+    CN:'#DE2910', JP:'#BC002D', KR:'#0047A0', IN:'#FF9933', TH:'#A51931', VN:'#DA251D',
+    PH:'#0038A8', ID:'#FF0000', MY:'#010066', SG:'#EF3340', LA:'#002868', KH:'#032EA1',
+    MM:'#FECB00', NP:'#DC143C', LK:'#8D153A', MN:'#C4272F', KZ:'#00AFCA', IL:'#0038B8',
+    PK:'#01411C',
+    AU:'#00008B', NZ:'#00247D', FJ:'#68BFE5', PG:'#CE1126'
+  };
+
+  function flagEmoji(code){
+    if(!code || code.length!==2) return '\u{1F3F3}\u{FE0F}';
+    var A = 0x1F1E6;
+    return String.fromCodePoint(A + (code.toUpperCase().charCodeAt(0)-65), A + (code.toUpperCase().charCodeAt(1)-65));
+  }
+
+  // ---------- State ----------
+  // No per-user tracking anywhere here — one shared board for the whole
+  // group, no logins, no identity. Everyone who opens the page sees and
+  // can change the same data.
+  var customBeers = {};      // code -> {b,s}
+  var stampedCodes = {};     // code -> true, once someone's stamped it for the group
+  var docRef = null;         // Firestore doc ref for the shared state, once configured
+  var dbReady = false;       // true once Firestore is configured and the doc is loaded
+  var currentCode = null;
+  var weeklyPick = null;
+  var roster = null;        // {date, name1, name2}
+  var rosterEditing = false;
+  var rosterHistoryList = []; // [{id,date,name1,beer1,name2,beer2}]
+  var editingHistoryId = null; // null = none, 'new' = adding a blank round, or an existing entry's id
+  var rosterSaveWarning = null; // set when a past-round save/delete fails, shown until the next attempt
+
+  function dataFor(code){
+    return BEERS[code] || customBeers[code] || null;
+  }
+  function isTried(code){
+    return !!stampedCodes[code];
+  }
+
+  // ---------- localStorage fallback (used only if FIREBASE_CONFIG above
+  // hasn't been filled in yet, so the page still works for local testing
+  // instead of silently doing nothing) ----------
+  var LS_KEY = 'beer-passport-standalone-v1';
+  function loadLocal(){
+    try{
+      var raw = localStorage.getItem(LS_KEY);
+      if(!raw) return;
+      var data = JSON.parse(raw);
+      stampedCodes = data.stamped || {};
+      customBeers = data.customBeers || {};
+      weeklyPick = data.weeklyPick || null;
+      roster = data.roster || null;
+      rosterHistoryList = data.rosterHistory || [];
+    }catch(e){}
+  }
+  function saveLocalState(){
+    try{
+      localStorage.setItem(LS_KEY, JSON.stringify({
+        stamped: stampedCodes, customBeers: customBeers, weeklyPick: weeklyPick,
+        roster: roster, rosterHistory: rosterHistoryList
+      }));
+    }catch(e){}
+  }
+
+  function setSync(ok, text){
+    var dot = document.getElementById('sync-dot');
+    var txt = document.getElementById('sync-text');
+    dot.className = 'dot' + (ok?'':' off');
+    txt.textContent = text;
+  }
+
+  // ---------- Map ----------
+  var mapInstance = null;
+  function regionStyleFor(code){
+    if(weeklyPick && code===weeklyPick.code && !isTried(code)) return '#C9A227';
+    if(isTried(code)) return '#2F5233';
+    if(dataFor(code)) return '#D9CFBC';
+    return '#EAE2D0';
+  }
+  function refreshMapColors(){
+    if(!mapInstance || !mapInstance.regions) return;
+    var colors = {};
+    Object.keys(BEERS).forEach(function(code){ colors[code] = regionStyleFor(code); });
+    Object.keys(customBeers).forEach(function(code){ colors[code] = regionStyleFor(code); });
+    if(weeklyPick) colors[weeklyPick.code] = regionStyleFor(weeklyPick.code);
+
+    // Confirmed from jsVectorMap's own source (dataVisualization.js): each region's
+    // live SVG element exposes setStyle(), which is exactly what the library's own
+    // built-in choropleth feature calls. Recoloring is cosmetic, so a stray region
+    // code (a territory the bundled map doesn't include) is skipped rather than
+    // breaking the rest of the paint.
+    Object.keys(colors).forEach(function(code){
+      try{
+        var region = mapInstance.regions[code];
+        if(region && region.element && typeof region.element.setStyle === 'function'){
+          region.element.setStyle({ fill: colors[code] });
+        }
+      }catch(e){}
+    });
+  }
+
+  function initMap(){
+    mapInstance = new jsVectorMap({
+      selector: '#map',
+      map: 'world',
+      zoomButtons: true,
+      zoomOnScroll: false,
+      selectedRegions: [],
+      regionsSelectable: false,
+      backgroundColor: '#CFE8F2',
+      regionStyle: {
+        initial: { fill:'#EAE2D0', stroke:'#BEB194', strokeWidth:0.5 },
+        hover: { fill:'#B5651D', cursor:'pointer' }
+      },
+      // Just the country name now \u2014 the library's own tooltip text already
+      // is that, so there's nothing to add here; the beer only shows up
+      // once you actually tap through to the card.
+      onRegionClick: function(event, code){
+        selectCountry(code.toUpperCase());
+      },
+      onLoaded: function(){ refreshMapColors(); }
+    });
+    refreshMapColors();
+  }
+
+  // ---------- Panel rendering ----------
+
+  // On narrow (phone-width) layouts a target section can sit below the fold,
+  // so bring it into view after a tap rather than leaving the person to
+  // scroll down and find it themselves.
+  function scrollIntoViewOnMobile(el){
+    if(!el) return;
+    if(window.matchMedia && window.matchMedia('(max-width: 860px)').matches){
+      setTimeout(function(){ el.scrollIntoView({behavior:'smooth', block:'start'}); }, 50);
+    }
+  }
+
+  function selectCountry(code){
+    currentCode = code;
+    renderPanel();
+    highlightListRow(code);
+    // Align the MAP's top with the screen top, not the beer card's — that
+    // keeps the whole map in view with most of the card visible below it,
+    // instead of the card taking over the screen and hiding the map.
+    scrollIntoViewOnMobile(document.getElementById('map-view'));
+  }
+
+  function highlightListRow(code){
+    // no-op placeholder for future affordance; list rows are clickable already
+  }
+
+  function renderPanel(){
+    var panel = document.getElementById('panel');
+    var code = currentCode;
+    if(!code){ return; }
+    var d = dataFor(code);
+
+    if(!d){
+      panel.innerHTML =
+        '<div class="panel-flag">'+flagEmoji(code)+'</div>'+
+        '<div class="panel-country">'+code+'</div>'+
+        '<div class="panel-beer" style="font-size:22px;">No beer logged yet</div>'+
+        '<div class="panel-note">Know the local favorite here? Add it so the group can track it too.</div>'+
+        '<div class="custom-form">'+
+          '<label>Beer name</label><input id="cf-name" type="text" placeholder="e.g. Local Pale Lager">'+
+          '<label>Style (optional)</label><input id="cf-style" type="text" placeholder="e.g. Lager, Stout, IPA…">'+
+          '<button class="save-note" id="cf-save" type="button">Add to the map</button>'+
+        '</div>';
+      document.getElementById('cf-save').onclick = function(){
+        var name = document.getElementById('cf-name').value.trim();
+        var style = document.getElementById('cf-style').value.trim();
+        if(!name) return;
+        addCustomBeer(code, name, style);
+      };
+      return;
+    }
+
+    var tried = isTried(code);
+
+    var html = '';
+    html += '<div class="panel-flag">'+flagEmoji(code)+'</div>';
+    html += '<div class="panel-country">'+d.c+'</div>';
+    html += '<div class="panel-beer">'+d.b+'</div>';
+    html += '<div class="panel-meta">'+(d.s||'')+(d.br?' \u00b7 '+d.br:'')+'</div>';
+    if(d.n) html += '<div class="panel-note">'+d.n+'</div>';
+    html += '<button class="stamp-btn'+(tried?' tried':'')+'" id="stamp-btn" type="button">'+(tried?'\u2713 Stamped':'Stamp this passport')+'</button>';
+
+    panel.innerHTML = html;
+
+    document.getElementById('stamp-btn').onclick = function(){ toggleStamp(code); };
+  }
+
+  function escapeHtml(s){
+    var div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  function popStamp(){
+    var el = document.createElement('div');
+    el.className = 'stamp-pop';
+    el.textContent = 'Stamped!';
+    var panel = document.getElementById('panel');
+    var rect = panel.getBoundingClientRect();
+    el.style.left = '30px';
+    el.style.top = '20px';
+    panel.style.position = 'relative';
+    panel.appendChild(el);
+    setTimeout(function(){ el.remove(); }, 650);
+  }
+
+  // ---------- Writes ----------
+  // A single shared write helper: patches use Firestore's dot-notation
+  // (e.g. "stamped.US") so each write only touches the one field it's
+  // changing, never the whole document — safe for several people tapping
+  // at once. Falls back to localStorage if Firebase hasn't been configured
+  // yet (see FIREBASE_CONFIG above), so the page still works for testing.
+  function writePatch(patch){
+    if(docRef){
+      docRef.update(patch).catch(function(){
+        // update() rejects if the document doesn't exist yet — shouldn't
+        // happen (boot() creates it), but a merge-set is a safe fallback
+        // rather than silently losing the write.
+        docRef.set(patch, { merge:true }).catch(function(){});
+      });
+    }else{
+      saveLocalState();
+    }
+  }
+
+  function toggleStamp(code){
+    var next = !stampedCodes[code];
+    stampedCodes[code] = next;
+    renderPanel(); refreshMapColors(); renderList(); renderStats();
+    if(next) popStamp();
+    var patch = {};
+    patch['stamped.'+code] = next;
+    writePatch(patch);
+  }
+
+  function addCustomBeer(code, name, style){
+    customBeers[code] = { c: code, b:name, s:style||'', br:'', n:'' };
+    renderPanel(); refreshMapColors(); renderList();
+    var patch = {};
+    patch['customBeers.'+code] = { b:name, s:style||'' };
+    writePatch(patch);
+  }
+
+  // ---------- List view ----------
+  function allEntriesFlat(){
+    var codes = {};
+    Object.keys(BEERS).forEach(function(c){ codes[c]=true; });
+    Object.keys(customBeers).forEach(function(c){ codes[c]=true; });
+    return Object.keys(codes).map(function(code){
+      var d = dataFor(code);
+      return { code:code, name:d.c, beer:d.b, tried:isTried(code) };
+    }).sort(function(a,b){ return a.name.localeCompare(b.name); });
+  }
+
+  function renderList(){
+    var q = (document.getElementById('search-input').value||'').toLowerCase().trim();
+    var rows = allEntriesFlat().filter(function(r){
+      if(!q) return true;
+      return r.name.toLowerCase().indexOf(q)>=0 || r.beer.toLowerCase().indexOf(q)>=0;
+    });
+    // Ticked-off beers float to the top; within each group, alphabetical (already sorted).
+    rows.sort(function(a,b){ return (b.tried?1:0) - (a.tried?1:0); });
+    var el = document.getElementById('list-view');
+    if(!rows.length){
+      el.innerHTML = '<div style="padding:30px; text-align:center; color:var(--ink-soft);">No matches. Try a different search.</div>';
+      return;
+    }
+    el.innerHTML = rows.map(function(r){
+      var tintStyle = '';
+      if(r.tried && FLAG_COLORS[r.code]){
+        tintStyle = ' style="background:color-mix(in srgb, '+FLAG_COLORS[r.code]+' 16%, var(--card));"';
+      }
+      return '<div class="country-row'+(r.tried?' tried':'')+'" data-code="'+r.code+'"'+tintStyle+'>'+
+        '<div class="flag">'+flagEmoji(r.code)+'</div>'+
+        '<div class="names"><div class="cname">'+escapeHtml(r.name)+'</div><div class="bname">'+escapeHtml(r.beer)+'</div></div>'+
+        '<div class="cb">'+(r.tried?'\u2713':'')+'</div>'+
+      '</div>';
+    }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('.country-row'), function(row){
+      row.addEventListener('click', function(){
+        document.getElementById('tab-map').click();
+        selectCountry(row.getAttribute('data-code'));
+      });
+    });
+  }
+
+  // ---------- Stats ----------
+  function renderStats(){
+    var triedCodes = Object.keys(stampedCodes).filter(function(c){ return stampedCodes[c]; });
+    document.getElementById('stat-tried').textContent = triedCodes.length;
+  }
+
+  // ---------- Weekly pick ----------
+  function pickWeekly(){
+    var untried = Object.keys(BEERS).filter(function(c){ return !isTried(c); });
+    if(!untried.length){ untried = Object.keys(BEERS); }
+    var code = untried[Math.floor(Math.random()*untried.length)];
+    weeklyPick = { code: code, pickedAt: Date.now() };
+    refreshMapColors();
+    renderWeeklyBanner();
+    selectCountry(code);
+    writePatch({ weeklyPick: weeklyPick });
+  }
+
+  function renderWeeklyBanner(){
+    var banner = document.getElementById('weekly-banner');
+    if(!weeklyPick){ banner.style.display = 'none'; return; }
+    var d = dataFor(weeklyPick.code);
+    banner.style.display = 'flex';
+    banner.innerHTML =
+      '<div><div class="wp-label">This week\u2019s pick</div><div class="wp-beer">'+flagEmoji(weeklyPick.code)+' '+(d?d.b+' \u2014 '+d.c:weeklyPick.code)+'</div></div>'+
+      '<button class="wp-cancel" id="wp-cancel-btn" type="button">Cancel pick</button>';
+    document.getElementById('wp-cancel-btn').onclick = cancelWeekly;
+  }
+
+  function cancelWeekly(){
+    weeklyPick = null;
+    refreshMapColors();
+    renderWeeklyBanner();
+    writePatch({ weeklyPick: null });
+  }
+
+  // ---------- Roster ----------
+  function formatRosterDate(iso){
+    if(!iso) return '';
+    var d = new Date(iso+'T00:00:00');
+    if(isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString(undefined, {weekday:'short', day:'numeric', month:'short'});
+  }
+
+  function personLineHtml(name, beer){
+    if(!name) return '';
+    return escapeHtml(name) + (beer ? ' <span class="rd-beer">— '+escapeHtml(beer)+'</span>' : '');
+  }
+
+  // ---------- Roster: next round (names only — beers get filled in afterwards) ----------
+  function renderRosterCurrentHtml(){
+    var hasData = roster && (roster.date || roster.name1 || roster.name2);
+    var showEdit = rosterEditing || !hasData;
+
+    if(showEdit){
+      return '<h4>Next round — who’s up</h4>'+
+        '<div class="roster-form">'+
+          '<div class="rf-field"><label>Date</label><input type="date" id="rf-date" value="'+(roster&&roster.date?roster.date:'')+'"></div>'+
+          '<div class="rf-field"><label>Name 1</label><input type="text" id="rf-name1" placeholder="e.g. Fred" value="'+(roster&&roster.name1?escapeHtml(roster.name1):'')+'"></div>'+
+          '<div class="rf-field"><label>Name 2</label><input type="text" id="rf-name2" placeholder="e.g. Barney" value="'+(roster&&roster.name2?escapeHtml(roster.name2):'')+'"></div>'+
+          '<div class="roster-form-actions">'+
+            '<button class="save-note" id="rf-save" type="button" style="background:var(--stamp);color:#EFF6EE;">Save</button>'+
+            (hasData?'<button class="wp-cancel" id="rf-cancel" type="button">Cancel</button>':'')+
+          '</div>'+
+        '</div>';
+    }
+
+    var names = [roster.name1, roster.name2].filter(Boolean).map(escapeHtml).join(' &nbsp;&amp;&nbsp; ');
+    return '<h4>Next round — who’s up</h4>'+
+      '<div class="roster-display">'+
+        '<div class="roster-info">'+
+          '<div class="rd-date">'+(roster.date?formatRosterDate(roster.date):'Date TBC')+'</div>'+
+          '<div class="rd-names">'+(names||'No one assigned yet')+'</div>'+
+        '</div>'+
+        '<button class="wp-cancel" id="roster-edit-btn" type="button">Edit</button>'+
+      '</div>';
+  }
+
+  function saveRoster(date, name1, name2){
+    roster = { date: date||'', name1: name1||'', name2: name2||'' };
+    rosterEditing = false;
+    renderRosterView();
+    writePatch({ roster: roster });
+  }
+
+  // ---------- Roster: past rounds (each entry fully editable after the fact) ----------
+  function blankHistoryEntry(){
+    return { id:null, date:'', name1:'', beer1:'', name2:'', beer2:'' };
+  }
+
+  function historyEditRowHtml(h){
+    var idAttr = h.id || '';
+    return '<div class="history-row history-row-editing">'+
+        '<div class="roster-form">'+
+          '<div class="rf-field"><label>Date</label><input type="date" class="he-date" value="'+(h.date||'')+'"></div>'+
+          '<div class="rf-field"><label>Name 1</label><input type="text" class="he-name1" placeholder="e.g. Fred" value="'+(h.name1?escapeHtml(h.name1):'')+'"></div>'+
+          '<div class="rf-field"><label>Beer 1</label><input type="text" class="he-beer1" placeholder="e.g. Beck’s" value="'+(h.beer1?escapeHtml(h.beer1):'')+'"></div>'+
+          '<div class="rf-field"><label>Name 2</label><input type="text" class="he-name2" placeholder="e.g. Barney" value="'+(h.name2?escapeHtml(h.name2):'')+'"></div>'+
+          '<div class="rf-field"><label>Beer 2</label><input type="text" class="he-beer2" placeholder="e.g. Corona" value="'+(h.beer2?escapeHtml(h.beer2):'')+'"></div>'+
+          '<div class="roster-form-actions">'+
+            '<button class="save-note he-save" data-id="'+idAttr+'" type="button" style="background:var(--stamp);color:#EFF6EE;">Save</button>'+
+            '<button class="wp-cancel he-cancel" type="button">Cancel</button>'+
+            (idAttr?'<button class="wp-cancel he-delete" data-id="'+idAttr+'" type="button">Delete</button>':'')+
+          '</div>'+
+        '</div>'+
+      '</div>';
+  }
+
+  function renderRosterHistoryHtml(){
+    var list = rosterHistoryList.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+    var addingNew = editingHistoryId === 'new';
+    var rowsHtml = list.map(function(h){
+      if(editingHistoryId && editingHistoryId!=='new' && h.id === editingHistoryId){
+        return historyEditRowHtml(h);
+      }
+      var line1 = personLineHtml(h.name1, h.beer1);
+      var line2 = personLineHtml(h.name2, h.beer2);
+      var namesHtml = [line1, line2].filter(Boolean).map(function(l){ return '<div class="hr-name-line">'+l+'</div>'; }).join('');
+      return '<div class="history-row">'+
+        '<div><div class="hr-date">'+(h.date?formatRosterDate(h.date):'Date unknown')+'</div><div class="hr-names">'+(namesHtml||'—')+'</div></div>'+
+        '<button class="wp-cancel history-edit-btn" data-id="'+h.id+'" type="button">Edit</button>'+
+      '</div>';
+    }).join('');
+
+    var newRowHtml = addingNew ? historyEditRowHtml(blankHistoryEntry()) : '';
+
+    if(!list.length && !addingNew){
+      rowsHtml = '<div style="padding:30px; text-align:center; color:var(--ink-soft);">No past rounds logged yet — add one once a round’s been and gone.</div>';
+    }
+    return newRowHtml + rowsHtml;
+  }
+
+  function renderRosterView(){
+    var el = document.getElementById('roster-view');
+    if(!el) return;
+    el.innerHTML =
+      '<div class="roster-card">'+renderRosterCurrentHtml()+'</div>'+
+      '<div class="roster-history-heading">Past rounds<button class="roster-add-btn" id="add-round-btn" type="button">+ Add round</button></div>'+
+      (rosterSaveWarning ? '<div class="roster-save-warning">'+escapeHtml(rosterSaveWarning)+'</div>' : '')+
+      '<div id="roster-history-rows">'+renderRosterHistoryHtml()+'</div>';
+
+    var saveBtn = document.getElementById('rf-save');
+    if(saveBtn){
+      saveBtn.onclick = function(){
+        var date = document.getElementById('rf-date').value;
+        var name1 = document.getElementById('rf-name1').value.trim();
+        var name2 = document.getElementById('rf-name2').value.trim();
+        saveRoster(date, name1, name2);
+      };
+    }
+    var cancelBtn = document.getElementById('rf-cancel');
+    if(cancelBtn){
+      cancelBtn.onclick = function(){ rosterEditing = false; renderRosterView(); };
+    }
+    var editBtn = document.getElementById('roster-edit-btn');
+    if(editBtn){
+      editBtn.onclick = function(){ rosterEditing = true; renderRosterView(); };
+    }
+
+    var addBtn = document.getElementById('add-round-btn');
+    if(addBtn){
+      addBtn.onclick = function(){ editingHistoryId = 'new'; renderRosterView(); };
+    }
+    Array.prototype.forEach.call(el.querySelectorAll('.history-edit-btn'), function(btn){
+      btn.onclick = function(){ editingHistoryId = btn.getAttribute('data-id'); renderRosterView(); };
+    });
+
+    var saveRowBtn = el.querySelector('.he-save');
+    if(saveRowBtn){
+      saveRowBtn.onclick = function(){
+        var wrap = saveRowBtn.closest('.history-row-editing');
+        var date = wrap.querySelector('.he-date').value;
+        var name1 = wrap.querySelector('.he-name1').value.trim();
+        var beer1 = wrap.querySelector('.he-beer1').value.trim();
+        var name2 = wrap.querySelector('.he-name2').value.trim();
+        var beer2 = wrap.querySelector('.he-beer2').value.trim();
+        var id = saveRowBtn.getAttribute('data-id') || null;
+        saveHistoryEntry(id, date, name1, beer1, name2, beer2);
+      };
+    }
+    var cancelRowBtn = el.querySelector('.he-cancel');
+    if(cancelRowBtn){
+      cancelRowBtn.onclick = function(){ editingHistoryId = null; renderRosterView(); };
+    }
+    var deleteRowBtn = el.querySelector('.he-delete');
+    if(deleteRowBtn){
+      deleteRowBtn.onclick = function(){ deleteHistoryEntry(deleteRowBtn.getAttribute('data-id')); };
+    }
+  }
+
+  // Past rounds are kept as one array field on the single shared document,
+  // alongside stamped/customBeers/weeklyPick/roster — the whole passport is
+  // one Firestore document, so this just rewrites that one field.
+  function writeRosterHistory(){
+    if(docRef){
+      docRef.update({ rosterHistory: rosterHistoryList }).catch(function(){
+        rosterSaveWarning = 'Couldn’t save that — it may not still be here after a refresh. Check your connection and try again.';
+        if(document.getElementById('roster-view').classList.contains('active')) renderRosterView();
+      });
+    }else{
+      saveLocalState();
+    }
+  }
+
+  function saveHistoryEntry(id, date, name1, beer1, name2, beer2){
+    if(!id){ id = 'h_' + Date.now() + '_' + Math.random().toString(36).slice(2,7); }
+    var record = { id:id, date:date||'', name1:name1||'', beer1:beer1||'', name2:name2||'', beer2:beer2||'' };
+    var idx = -1;
+    for(var i=0;i<rosterHistoryList.length;i++){ if(rosterHistoryList[i].id===id){ idx=i; break; } }
+    if(idx>=0){ rosterHistoryList = rosterHistoryList.slice(); rosterHistoryList[idx] = record; }
+    else{ rosterHistoryList = rosterHistoryList.concat([record]); }
+    editingHistoryId = null;
+    rosterSaveWarning = null;
+    renderRosterView();
+    writeRosterHistory();
+  }
+
+  function deleteHistoryEntry(id){
+    rosterHistoryList = rosterHistoryList.filter(function(h){ return h.id!==id; });
+    editingHistoryId = null;
+    renderRosterView();
+    writeRosterHistory();
+  }
+
+  // ---------- Tabs / search ----------
+  function showView(view){
+    document.getElementById('tab-map').classList.toggle('active', view==='map');
+    document.getElementById('tab-list').classList.toggle('active', view==='list');
+    document.getElementById('tab-roster').classList.toggle('active', view==='roster');
+    document.getElementById('map-view').classList.toggle('hidden', view!=='map');
+    document.getElementById('list-view').classList.toggle('active', view==='list');
+    document.getElementById('roster-view').classList.toggle('active', view==='roster');
+    // The search box only ever filters the List view — it never did anything
+    // on Map (nothing to filter there), so show it only where it's live.
+    document.getElementById('search-input').style.display = (view==='list') ? '' : 'none';
+    if(view==='list') renderList();
+    if(view==='roster') renderRosterView();
+  }
+  document.getElementById('tab-map').onclick = function(){ showView('map'); };
+  document.getElementById('tab-list').onclick = function(){ showView('list'); };
+  document.getElementById('tab-roster').onclick = function(){ showView('roster'); };
+  document.getElementById('search-input').addEventListener('input', function(){
+    if(document.getElementById('list-view').classList.contains('active')) renderList();
+  });
+  document.getElementById('spin-btn').onclick = pickWeekly;
+  var statTriedCard = document.getElementById('stat-tried-card');
+  function goToListAndScroll(){
+    showView('list');
+    scrollIntoViewOnMobile(document.getElementById('list-view'));
+  }
+  statTriedCard.onclick = goToListAndScroll;
+  statTriedCard.addEventListener('keydown', function(ev){
+    if(ev.key==='Enter' || ev.key===' '){ ev.preventDefault(); goToListAndScroll(); }
+  });
+
+  // ---------- Init ----------
+  function boot(){
+    initMap();
+    renderStats();
+    setupSync();
+  }
+
+  function setupSync(){
+    var configured = FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey &&
+      FIREBASE_CONFIG.apiKey.indexOf('PASTE-YOUR') !== 0;
+
+    if(!configured || typeof firebase === 'undefined'){
+      // No Firebase project wired up yet (or its scripts failed to load) —
+      // fall back to this browser's own localStorage so the page still
+      // works while testing, rather than silently doing nothing.
+      loadLocal();
+      setSync(false, configured
+        ? 'Could not reach Firebase \u2014 running in solo/local mode'
+        : 'Firebase not set up yet \u2014 running in solo/local mode (see FIREBASE_CONFIG in the code)');
+      renderStats(); refreshMapColors(); renderWeeklyBanner();
+      return;
+    }
+
+    try{ firebase.initializeApp(FIREBASE_CONFIG); }catch(e){ /* already initialized — fine */ }
+    var db = firebase.firestore();
+    docRef = db.collection('passport').doc('state');
+
+    // update() rejects if the document doesn't exist yet, so make sure it
+    // does before anything tries to write a field to it. set(..., {merge})
+    // creates it if missing and leaves it untouched if it's already there.
+    docRef.set({}, { merge:true }).catch(function(){});
+
+    docRef.onSnapshot(function(doc){
+      var v = doc.exists ? (doc.data()||{}) : {};
+      stampedCodes = v.stamped || {};
+      var cb = {};
+      Object.keys(v.customBeers||{}).forEach(function(code){
+        var c = v.customBeers[code] || {};
+        cb[code] = { c: code, b:c.b||'', s:c.s||'', br:'', n:'' };
+      });
+      customBeers = cb;
+      weeklyPick = (v.weeklyPick && v.weeklyPick.code) ? v.weeklyPick : null;
+      roster = v.roster || null;
+      rosterHistoryList = Array.isArray(v.rosterHistory) ? v.rosterHistory : [];
+      dbReady = true;
+
+      setSync(true, 'Synced with the group');
+      renderStats(); refreshMapColors(); renderList(); renderWeeklyBanner();
+      if(currentCode) renderPanel();
+      if(!rosterEditing && editingHistoryId===null &&
+         document.getElementById('roster-view').classList.contains('active')) renderRosterView();
+    }, function(){
+      setSync(false, 'Sync interrupted \u2014 changes may not save');
+    });
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>
+
+</body></html>
