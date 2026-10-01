@@ -567,19 +567,19 @@
   //    that link with the group instead of this Firebase console.
   // ============================================================
   var FIREBASE_CONFIG = {
-     apiKey: "AIzaSyC_g1UPvCkL29T6B5xucAVnPwEDM5Cp_jU",
-	authDomain: "terrigal-gents-tennis.firebaseapp.com",
-	projectId: "terrigal-gents-tennis",
-	storageBucket: "terrigal-gents-tennis.firebasestorage.app",
-	messagingSenderId: "551610067830",
-	appId: "1:551610067830:web:0c9c90e903c9bc157e6857"
+    apiKey: "AIzaSyC_g1UPvCkL29T6B5xucAVnPwEDM5Cp_jU",
+    authDomain: "terrigal-gents-tennis.firebaseapp.com",
+    projectId: "terrigal-gents-tennis",
+    storageBucket: "terrigal-gents-tennis.firebasestorage.app",
+    messagingSenderId: "551610067830",
+    appId: "1:551610067830:web:0c9c90e903c9bc157e6857"
   };
 
   // ---------- Beer data (curated) ----------
   var BEERS = {
     US:{c:"United States",b:"Budweiser",s:"American Lager",br:"Anheuser-Busch",n:"The self-styled \u201cKing of Beers,\u201d brewed since 1876 and still the beer most Americans picture first."},
     CA:{c:"Canada",b:"Labatt Blue",s:"Pale Lager",br:"Labatt",n:"A crisp, mild lager that's been a hockey-game staple since 1951."},
-    MX:{c:"Mexico",b:"Corona",s:"Pale Lager",br:"Grupo Modelo",n:"The lime wedge is optional, the export success is not \u2014 one of the best-selling beers on earth."},
+    MX:{c:"Mexico",b:"Sol",s:"Pale Lager",br:"Heineken M\u00e9xico (Cuauht\u00e9moc Moctezuma)",n:"Brewed since 1899, a light golden lager usually served with salt and a wedge of lime \u2014 one of Mexico's biggest exports."},
     BR:{c:"Brazil",b:"Brahma",s:"Pale Lager",br:"Ambev",n:"Founded in 1888, Brahma practically defines the Brazilian bar fridge."},
     AR:{c:"Argentina",b:"Quilmes",s:"Pale Lager",br:"Quilmes",n:"Named after the town where it was first brewed in 1888; unofficial soundtrack to every asado."},
     CL:{c:"Chile",b:"Cristal",s:"Pale Lager",br:"CCU",n:"Chile's best-seller since 1904, usually served ice-cold."},
@@ -1010,13 +1010,22 @@
   }
 
   // ---------- List view ----------
+  // All the beer names logged for a country, curated default first — so the
+  // List view shows "Corona, Sol" once someone's added Sol, rather than just
+  // the curated default regardless of what's actually been tried.
+  function beerNamesFor(code){
+    var names = [];
+    if(BEERS[code]) names.push(BEERS[code].b);
+    extrasFor(code).forEach(function(ex){ names.push(ex.b); });
+    return names;
+  }
   function allEntriesFlat(){
     var codes = {};
     Object.keys(BEERS).forEach(function(c){ codes[c]=true; });
     Object.keys(extraBeers).forEach(function(c){ codes[c]=true; });
     return Object.keys(codes).map(function(code){
       var d = primaryBeerFor(code);
-      return { code:code, name:d.c, beer:d.b, tried:isTried(code) };
+      return { code:code, name:d.c, beer:beerNamesFor(code).join(', '), tried:isTried(code) };
     }).sort(function(a,b){ return a.name.localeCompare(b.name); });
   }
 
