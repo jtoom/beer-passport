@@ -361,6 +361,27 @@
   }
   .custom-form .save-note{background:var(--stamp); color:#EFF6EE;}
 
+  .also-tried{margin-top:18px; padding-top:16px; border-top:1px dashed var(--stone-dark);}
+  .also-tried-heading{
+    font-family:'Inter',sans-serif; font-size:12px; letter-spacing:.05em; text-transform:uppercase;
+    color:var(--ink-soft); margin:0 0 10px;
+  }
+  .also-tried-list{margin-bottom:4px;}
+  .atr-row{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:9px 12px; border-radius:5px; background:var(--paper); border:1px solid var(--stone-dark);
+    margin-bottom:7px;
+  }
+  .atr-name{font-family:'Outfit',sans-serif; font-weight:600; font-size:14.5px;}
+  .atr-style{font-size:12.5px; color:var(--ink-soft); margin-top:1px;}
+  .atr-remove{
+    background:transparent; border:1px solid var(--stone-dark); color:var(--ink-soft);
+    width:26px; height:26px; border-radius:50%; flex:none; cursor:pointer;
+    font-size:15px; line-height:1; display:flex; align-items:center; justify-content:center;
+  }
+  .atr-remove:hover{border-color:var(--danger); color:var(--danger);}
+  .also-tried-empty{font-size:13.5px; color:var(--ink-soft); margin-bottom:12px;}
+
   .weekly-pick{
     background:var(--stone); border-radius:8px; padding:16px 18px; font-size:14px;
   }
@@ -546,12 +567,12 @@
   //    that link with the group instead of this Firebase console.
   // ============================================================
   var FIREBASE_CONFIG = {
-	  apiKey: "AIzaSyC_g1UPvCkL29T6B5xucAVnPwEDM5Cp_jU",
-	  authDomain: "terrigal-gents-tennis.firebaseapp.com",
-	  projectId: "terrigal-gents-tennis",
-	  storageBucket: "terrigal-gents-tennis.firebasestorage.app",
-	  messagingSenderId: "551610067830",
-	  appId: "1:551610067830:web:0c9c90e903c9bc157e6857"
+    apiKey: "PASTE-YOUR-API-KEY-HERE",
+    authDomain: "your-project.firebaseapp.com",
+    projectId: "your-project-id",
+    storageBucket: "your-project.appspot.com",
+    messagingSenderId: "000000000000",
+    appId: "1:000000000000:web:xxxxxxxxxxxxxxxxxxxxxx"
   };
 
   // ---------- Beer data (curated) ----------
@@ -699,7 +720,11 @@
   // No per-user tracking anywhere here — one shared board for the whole
   // group, no logins, no identity. Everyone who opens the page sees and
   // can change the same data.
-  var customBeers = {};      // code -> {b,s}
+  var extraBeers = {};       // code -> [{id,b,s}, ...] — extra beers the group has
+                              // logged for a country, alongside (or instead of) the
+                              // curated default in BEERS above. A country can rack up
+                              // more than one this way, e.g. Corona AND a Sol someone
+                              // brought along.
   var stampedCodes = {};     // code -> true, once someone's stamped it for the group
   var docRef = null;         // Firestore doc ref for the shared state, once configured
   var dbReady = false;       // true once Firestore is configured and the doc is loaded
@@ -711,8 +736,20 @@
   var editingHistoryId = null; // null = none, 'new' = adding a blank round, or an existing entry's id
   var rosterSaveWarning = null; // set when a past-round save/delete fails, shown until the next attempt
 
-  function dataFor(code){
-    return BEERS[code] || customBeers[code] || null;
+  // The curated entry (if any) is always a country's "default" beer. extraBeers
+  // are additional ones the group has logged on top of it — or, for a country
+  // with no curated entry, the first one logged stands in as the default.
+  function extrasFor(code){
+    return extraBeers[code] || [];
+  }
+  function hasAnyData(code){
+    return !!BEERS[code] || extrasFor(code).length > 0;
+  }
+  function primaryBeerFor(code){
+    if(BEERS[code]) return BEERS[code];
+    var ex = extrasFor(code);
+    if(ex.length) return { c: code, b: ex[0].b, s: ex[0].s||'', br:'', n:'' };
+    return null;
   }
   function isTried(code){
     return !!stampedCodes[code];
@@ -728,7 +765,7 @@
       if(!raw) return;
       var data = JSON.parse(raw);
       stampedCodes = data.stamped || {};
-      customBeers = data.customBeers || {};
+      extraBeers = data.extraBeers || {};
       weeklyPick = data.weeklyPick || null;
       roster = data.roster || null;
       rosterHistoryList = data.rosterHistory || [];
@@ -737,7 +774,7 @@
   function saveLocalState(){
     try{
       localStorage.setItem(LS_KEY, JSON.stringify({
-        stamped: stampedCodes, customBeers: customBeers, weeklyPick: weeklyPick,
+        stamped: stampedCodes, extraBeers: extraBeers, weeklyPick: weeklyPick,
         roster: roster, rosterHistory: rosterHistoryList
       }));
     }catch(e){}
@@ -755,14 +792,14 @@
   function regionStyleFor(code){
     if(weeklyPick && code===weeklyPick.code && !isTried(code)) return '#C9A227';
     if(isTried(code)) return '#2F5233';
-    if(dataFor(code)) return '#D9CFBC';
+    if(hasAnyData(code)) return '#D9CFBC';
     return '#EAE2D0';
   }
   function refreshMapColors(){
     if(!mapInstance || !mapInstance.regions) return;
     var colors = {};
     Object.keys(BEERS).forEach(function(code){ colors[code] = regionStyleFor(code); });
-    Object.keys(customBeers).forEach(function(code){ colors[code] = regionStyleFor(code); });
+    Object.keys(extraBeers).forEach(function(code){ colors[code] = regionStyleFor(code); });
     if(weeklyPick) colors[weeklyPick.code] = regionStyleFor(weeklyPick.code);
 
     // Confirmed from jsVectorMap's own source (dataVisualization.js): each region's
@@ -834,41 +871,75 @@
     var panel = document.getElementById('panel');
     var code = currentCode;
     if(!code){ return; }
-    var d = dataFor(code);
+    var curated = BEERS[code] || null;
+    var extras = extrasFor(code);
 
-    if(!d){
+    if(!curated && !extras.length){
       panel.innerHTML =
         '<div class="panel-flag">'+flagEmoji(code)+'</div>'+
         '<div class="panel-country">'+code+'</div>'+
         '<div class="panel-beer" style="font-size:22px;">No beer logged yet</div>'+
-        '<div class="panel-note">Know the local favorite here? Add it so the group can track it too.</div>'+
+        '<div class="panel-note">Know a beer from here? Add it so the group can track it.</div>'+
         '<div class="custom-form">'+
           '<label>Beer name</label><input id="cf-name" type="text" placeholder="e.g. Local Pale Lager">'+
-          '<label>Style (optional)</label><input id="cf-style" type="text" placeholder="e.g. Lager, Stout, IPA…">'+
+          '<label>Style (optional)</label><input id="cf-style" type="text" placeholder="e.g. Lager, Stout, IPA\u2026">'+
           '<button class="save-note" id="cf-save" type="button">Add to the map</button>'+
         '</div>';
       document.getElementById('cf-save').onclick = function(){
         var name = document.getElementById('cf-name').value.trim();
         var style = document.getElementById('cf-style').value.trim();
         if(!name) return;
-        addCustomBeer(code, name, style);
+        addExtraBeer(code, name, style);
       };
       return;
     }
 
     var tried = isTried(code);
+    // When there's a curated default, every extra is "also tried here". When
+    // there isn't, the first extra stands in as the main beer up top, so the
+    // also-tried list only covers whatever's been logged after it.
+    var mainBeer = curated || { c: code, b: extras[0].b, s: extras[0].s||'', br:'', n:'' };
+    var alsoTried = curated ? extras : extras.slice(1);
 
     var html = '';
     html += '<div class="panel-flag">'+flagEmoji(code)+'</div>';
-    html += '<div class="panel-country">'+d.c+'</div>';
-    html += '<div class="panel-beer">'+d.b+'</div>';
-    html += '<div class="panel-meta">'+(d.s||'')+(d.br?' \u00b7 '+d.br:'')+'</div>';
-    if(d.n) html += '<div class="panel-note">'+d.n+'</div>';
+    html += '<div class="panel-country">'+(curated?curated.c:code)+'</div>';
+    html += '<div class="panel-beer">'+escapeHtml(mainBeer.b)+'</div>';
+    html += '<div class="panel-meta">'+(mainBeer.s?escapeHtml(mainBeer.s):'')+(mainBeer.br?' \u00b7 '+escapeHtml(mainBeer.br):'')+'</div>';
+    if(mainBeer.n) html += '<div class="panel-note">'+mainBeer.n+'</div>';
     html += '<button class="stamp-btn'+(tried?' tried':'')+'" id="stamp-btn" type="button">'+(tried?'\u2713 Stamped':'Stamp this passport')+'</button>';
+
+    html += '<div class="also-tried">';
+    html += '<h4 class="also-tried-heading">Also tried here</h4>';
+    if(alsoTried.length){
+      html += '<div class="also-tried-list">'+alsoTried.map(function(ex){
+        return '<div class="atr-row">'+
+          '<div class="atr-info"><div class="atr-name">'+escapeHtml(ex.b)+'</div>'+(ex.s?'<div class="atr-style">'+escapeHtml(ex.s)+'</div>':'')+'</div>'+
+          '<button class="atr-remove" data-id="'+ex.id+'" type="button" title="Remove" aria-label="Remove '+escapeHtml(ex.b)+'">\u00d7</button>'+
+        '</div>';
+      }).join('')+'</div>';
+    }else{
+      html += '<div class="also-tried-empty">Nothing else logged for '+(curated?escapeHtml(curated.c):'here')+' yet.</div>';
+    }
+    html += '<div class="custom-form">'+
+        '<label>Beer name</label><input id="cf-name" type="text" placeholder="e.g. Sol">'+
+        '<label>Style (optional)</label><input id="cf-style" type="text" placeholder="e.g. Pale Lager">'+
+        '<button class="save-note" id="cf-save" type="button">+ Add another beer</button>'+
+      '</div>';
+    html += '</div>';
 
     panel.innerHTML = html;
 
     document.getElementById('stamp-btn').onclick = function(){ toggleStamp(code); };
+    document.getElementById('cf-save').onclick = function(){
+      var name = document.getElementById('cf-name').value.trim();
+      var style = document.getElementById('cf-style').value.trim();
+      if(!name) return;
+      addExtraBeer(code, name, style);
+    };
+    Array.prototype.forEach.call(panel.querySelectorAll('.atr-remove'), function(btn){
+      btn.onclick = function(){ removeExtraBeer(code, btn.getAttribute('data-id')); };
+    });
   }
 
   function escapeHtml(s){
@@ -919,11 +990,22 @@
     writePatch(patch);
   }
 
-  function addCustomBeer(code, name, style){
-    customBeers[code] = { c: code, b:name, s:style||'', br:'', n:'' };
+  function addExtraBeer(code, name, style){
+    var id = 'b_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+    var list = extrasFor(code).concat([{ id:id, b:name, s:style||'' }]);
+    extraBeers[code] = list;
     renderPanel(); refreshMapColors(); renderList();
     var patch = {};
-    patch['customBeers.'+code] = { b:name, s:style||'' };
+    patch['extraBeers.'+code] = list;
+    writePatch(patch);
+  }
+
+  function removeExtraBeer(code, id){
+    var list = extrasFor(code).filter(function(ex){ return ex.id !== id; });
+    extraBeers[code] = list;
+    renderPanel(); refreshMapColors(); renderList();
+    var patch = {};
+    patch['extraBeers.'+code] = list;
     writePatch(patch);
   }
 
@@ -931,9 +1013,9 @@
   function allEntriesFlat(){
     var codes = {};
     Object.keys(BEERS).forEach(function(c){ codes[c]=true; });
-    Object.keys(customBeers).forEach(function(c){ codes[c]=true; });
+    Object.keys(extraBeers).forEach(function(c){ codes[c]=true; });
     return Object.keys(codes).map(function(code){
-      var d = dataFor(code);
+      var d = primaryBeerFor(code);
       return { code:code, name:d.c, beer:d.b, tried:isTried(code) };
     }).sort(function(a,b){ return a.name.localeCompare(b.name); });
   }
@@ -991,7 +1073,7 @@
   function renderWeeklyBanner(){
     var banner = document.getElementById('weekly-banner');
     if(!weeklyPick){ banner.style.display = 'none'; return; }
-    var d = dataFor(weeklyPick.code);
+    var d = BEERS[weeklyPick.code];
     banner.style.display = 'flex';
     banner.innerHTML =
       '<div><div class="wp-label">This week\u2019s pick</div><div class="wp-beer">'+flagEmoji(weeklyPick.code)+' '+(d?d.b+' \u2014 '+d.c:weeklyPick.code)+'</div></div>'+
@@ -1161,7 +1243,7 @@
   }
 
   // Past rounds are kept as one array field on the single shared document,
-  // alongside stamped/customBeers/weeklyPick/roster — the whole passport is
+  // alongside stamped/extraBeers/weeklyPick/roster — the whole passport is
   // one Firestore document, so this just rewrites that one field.
   function writeRosterHistory(){
     if(docRef){
@@ -1260,12 +1342,26 @@
     docRef.onSnapshot(function(doc){
       var v = doc.exists ? (doc.data()||{}) : {};
       stampedCodes = v.stamped || {};
-      var cb = {};
-      Object.keys(v.customBeers||{}).forEach(function(code){
-        var c = v.customBeers[code] || {};
-        cb[code] = { c: code, b:c.b||'', s:c.s||'', br:'', n:'' };
+      var eb = {};
+      Object.keys(v.extraBeers||{}).forEach(function(code){
+        var list = v.extraBeers[code];
+        if(Array.isArray(list)){
+          eb[code] = list.map(function(ex){
+            return { id: ex.id || ('b_'+Math.random().toString(36).slice(2,9)), b: ex.b||'', s: ex.s||'' };
+          }).filter(function(ex){ return ex.b; });
+        }
       });
-      customBeers = cb;
+      // Back-compat: an older version of this page stored a single custom
+      // beer per country under "customBeers" instead of a list under
+      // "extraBeers" — fold any of those in as that country's first extra,
+      // rather than losing them the first time this loads.
+      Object.keys(v.customBeers||{}).forEach(function(code){
+        if(eb[code]) return;
+        var c = v.customBeers[code] || {};
+        if(!c.b) return;
+        eb[code] = [{ id:'b_legacy_'+code, b:c.b, s:c.s||'' }];
+      });
+      extraBeers = eb;
       weeklyPick = (v.weeklyPick && v.weeklyPick.code) ? v.weeklyPick : null;
       roster = v.roster || null;
       rosterHistoryList = Array.isArray(v.rosterHistory) ? v.rosterHistory : [];
