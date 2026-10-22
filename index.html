@@ -269,6 +269,7 @@
     .spin-btn{flex:1 1 100%; margin-left:0;}
     .panel{padding:18px;}
     .panel-beer{font-size:24px;}
+    .view-toggle button{padding:10px 13px;}
   }
 
   .map-card{
@@ -464,6 +465,40 @@
   .history-row .hr-name-line:first-child{margin-top:0;}
   .history-row.history-row-editing{display:block;}
 
+
+  .wi-date{font-family:'Outfit',sans-serif; font-weight:700; font-size:22px; line-height:1.15;}
+  .wi-summary{font-size:13.5px; color:var(--ink-soft); margin-top:5px;}
+  .wi-row{
+    display:flex; align-items:center; justify-content:space-between; gap:10px 12px; flex-wrap:wrap;
+    padding:10px 14px; border-radius:6px; background:var(--card);
+    border:1px solid var(--stone-dark); margin-bottom:8px;
+  }
+  .wi-name{font-family:'Outfit',sans-serif; font-weight:600; font-size:16px; flex:1; min-width:90px;}
+  .wi-opts{display:inline-flex; gap:6px;}
+  .wi-opt{
+    border:1px solid var(--stone-dark); background:transparent; color:var(--ink-soft);
+    font-family:'Inter',sans-serif; font-weight:600; font-size:13px;
+    padding:8px 14px; border-radius:999px; cursor:pointer; min-height:38px;
+    transition:background .12s ease, color .12s ease;
+  }
+  .wi-opt:hover{border-color:var(--ink-soft); color:var(--ink);}
+  .wi-opt.on-in{background:var(--stamp); border-color:var(--stamp); color:#EFF6EE;}
+  .wi-opt.on-out{background:var(--danger); border-color:var(--danger); color:#fff;}
+  .wi-opt.on-unsure{background:var(--gold); border-color:var(--gold); color:#2B2015;}
+  .wi-remove{
+    background:transparent; border:1px solid var(--stone-dark); color:var(--ink-soft);
+    width:30px; height:30px; border-radius:50%; flex:none; cursor:pointer;
+    font-size:16px; line-height:1; display:flex; align-items:center; justify-content:center;
+  }
+  .wi-remove:hover{border-color:var(--danger); color:var(--danger);}
+  .wi-add{display:flex; gap:8px; margin-top:12px;}
+  .wi-add input{
+    flex:1; min-width:0; padding:9px 12px; border-radius:5px; border:1px solid var(--stone-dark);
+    background:var(--paper); color:var(--ink); font-family:'Inter',sans-serif; font-size:16px; min-height:40px;
+  }
+  .wi-footer{display:flex; justify-content:flex-end; margin-top:6px;}
+  .wi-empty{padding:26px 10px; text-align:center; color:var(--ink-soft);}
+
   footer{max-width:1180px; margin:40px auto 0; padding:0 20px; font-size:12.5px; color:var(--ink-soft); text-align:center;}
 
   ::selection{background:var(--gold); color:#2B2015;}
@@ -492,6 +527,7 @@
       <button id="tab-map" class="active" type="button">Map</button>
       <button id="tab-list" type="button">List</button>
       <button id="tab-roster" type="button">Roster</button>
+      <button id="tab-whosin" type="button">Who’s in?</button>
     </div>
     <input class="search-input" id="search-input" type="text" placeholder="Find a country or beer…" style="display:none;">
     <span class="sync-note"><span class="dot off" id="sync-dot"></span><span id="sync-text">Connecting…</span></span>
@@ -511,6 +547,7 @@
       </div>
       <div class="list-view" id="list-view"></div>
       <div class="list-view" id="roster-view"></div>
+      <div class="list-view" id="whosin-view"></div>
     </div>
 
     <div class="panel" id="panel">
@@ -769,13 +806,16 @@
       weeklyPick = data.weeklyPick || null;
       roster = data.roster || null;
       rosterHistoryList = data.rosterHistory || [];
+      whosInMembers = data.whosInMembers || [];
+      whosInResponses = data.whosIn || {};
     }catch(e){}
   }
   function saveLocalState(){
     try{
       localStorage.setItem(LS_KEY, JSON.stringify({
         stamped: stampedCodes, extraBeers: extraBeers, weeklyPick: weeklyPick,
-        roster: roster, rosterHistory: rosterHistoryList
+        roster: roster, rosterHistory: rosterHistoryList,
+        whosInMembers: whosInMembers, whosIn: whosInResponses
       }));
     }catch(e){}
   }
@@ -1285,23 +1325,148 @@
     writeRosterHistory();
   }
 
+
+  // ---------- Who's in? (attendance for the upcoming Thursday) ----------
+  var whosInMembers = [];     // [{id,name}]
+  var whosInResponses = {};   // 'w20261022' -> { memberId: 'in'|'out'|'unsure' }
+  var whosInEditing = false;  // true while adding/removing members
+
+  function pad2(n){ return (n<10?'0':'')+n; }
+  // The next Thursday, or today if today is one.
+  function upcomingThursday(){
+    var d = new Date(); d.setHours(0,0,0,0);
+    d.setDate(d.getDate() + ((4 - d.getDay() + 7) % 7));
+    return d;
+  }
+  function weekKeyFor(d){
+    return 'w' + d.getFullYear() + pad2(d.getMonth()+1) + pad2(d.getDate());
+  }
+
+  function renderWhosInView(){
+    var el = document.getElementById('whosin-view');
+    if(!el) return;
+    var thu = upcomingThursday();
+    var key = weekKeyFor(thu);
+    var resp = whosInResponses[key] || {};
+    var counts = { 'in':0, out:0, unsure:0, none:0 };
+    whosInMembers.forEach(function(m){
+      var r = resp[m.id];
+      if(r==='in' || r==='out' || r==='unsure') counts[r]++; else counts.none++;
+    });
+
+    var dateText = thu.toLocaleDateString(undefined, {weekday:'long', day:'numeric', month:'long'});
+    var summary = whosInMembers.length
+      ? counts['in']+' in \u00b7 '+counts.out+' out \u00b7 '+counts.unsure+' unsure'+(counts.none?' \u00b7 '+counts.none+' yet to reply':'')
+      : 'Add the group\u2019s names below to get started.';
+
+    var html = '<div class="roster-card">'+
+      '<h4>This week\u2019s event</h4>'+
+      '<div class="wi-date">'+escapeHtml(dateText)+'</div>'+
+      '<div class="wi-summary">'+summary+'</div>'+
+    '</div>';
+
+    if(!whosInMembers.length){
+      html += '<div class="wi-empty">No one on the list yet.</div>';
+    }
+    html += whosInMembers.map(function(m){
+      var r = resp[m.id];
+      function opt(val, label){
+        return '<button class="wi-opt'+(r===val?' on-'+val:'')+'" data-id="'+m.id+'" data-val="'+val+'" type="button">'+label+'</button>';
+      }
+      return '<div class="wi-row">'+
+        '<div class="wi-name">'+escapeHtml(m.name)+'</div>'+
+        (whosInEditing
+          ? '<button class="wi-remove" data-id="'+m.id+'" type="button" title="Remove" aria-label="Remove '+escapeHtml(m.name)+'">\u00d7</button>'
+          : '<div class="wi-opts">'+opt('in','In')+opt('out','Out')+opt('unsure','Unsure')+'</div>')+
+      '</div>';
+    }).join('');
+
+    if(whosInEditing){
+      html += '<div class="wi-add"><input type="text" id="wi-new-name" placeholder="Add a name\u2026">'+
+        '<button class="save-note" id="wi-add-btn" type="button" style="margin-top:0;background:var(--stamp);color:#EFF6EE;">Add</button></div>';
+    }
+    html += '<div class="wi-footer"><button class="wp-cancel" id="wi-edit-btn" type="button">'+(whosInEditing?'Done':'Edit names')+'</button></div>';
+
+    el.innerHTML = html;
+
+    Array.prototype.forEach.call(el.querySelectorAll('.wi-opt'), function(btn){
+      btn.onclick = function(){ setWhosIn(btn.getAttribute('data-id'), btn.getAttribute('data-val')); };
+    });
+    Array.prototype.forEach.call(el.querySelectorAll('.wi-remove'), function(btn){
+      btn.onclick = function(){ removeWhosInMember(btn.getAttribute('data-id')); };
+    });
+    document.getElementById('wi-edit-btn').onclick = function(){ whosInEditing = !whosInEditing; renderWhosInView(); };
+    var addBtn = document.getElementById('wi-add-btn');
+    if(addBtn){
+      var input = document.getElementById('wi-new-name');
+      var doAdd = function(){
+        var name = input.value.trim();
+        if(!name) return;
+        addWhosInMember(name);
+      };
+      addBtn.onclick = doAdd;
+      input.addEventListener('keydown', function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); doAdd(); } });
+      input.focus();
+    }
+  }
+
+  // Tapping the answer you already gave clears it back to "yet to reply".
+  function setWhosIn(memberId, val){
+    var key = weekKeyFor(upcomingThursday());
+    var week = whosInResponses[key] = whosInResponses[key] || {};
+    var next = (week[memberId] === val) ? null : val;
+    if(next===null){ delete week[memberId]; } else { week[memberId] = next; }
+    renderWhosInView();
+    persistWhosInResponse(key, memberId, next);
+  }
+  function addWhosInMember(name){
+    var id = 'm_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+    whosInMembers = whosInMembers.concat([{ id:id, name:name }]);
+    renderWhosInView();
+    persistWhosInMembers();
+  }
+  function removeWhosInMember(id){
+    whosInMembers = whosInMembers.filter(function(m){ return m.id !== id; });
+    renderWhosInView();
+    persistWhosInMembers();
+  }
+
+  // Shared writes: one response = one dot-notation field, so two people
+  // tapping at once never overwrite each other's answers.
+  function persistWhosInResponse(key, memberId, val){
+    if(docRef){
+      var patch = {};
+      patch['whosIn.'+key+'.'+memberId] = (val===null) ? firebase.firestore.FieldValue.delete() : val;
+      writePatch(patch);
+    }else{
+      saveLocalState();
+    }
+  }
+  function persistWhosInMembers(){
+    writePatch({ whosInMembers: whosInMembers });
+  }
+
   // ---------- Tabs / search ----------
   function showView(view){
     document.getElementById('tab-map').classList.toggle('active', view==='map');
     document.getElementById('tab-list').classList.toggle('active', view==='list');
     document.getElementById('tab-roster').classList.toggle('active', view==='roster');
+    document.getElementById('tab-whosin').classList.toggle('active', view==='whosin');
     document.getElementById('map-view').classList.toggle('hidden', view!=='map');
     document.getElementById('list-view').classList.toggle('active', view==='list');
     document.getElementById('roster-view').classList.toggle('active', view==='roster');
+    document.getElementById('whosin-view').classList.toggle('active', view==='whosin');
     // The search box only ever filters the List view — it never did anything
     // on Map (nothing to filter there), so show it only where it's live.
     document.getElementById('search-input').style.display = (view==='list') ? '' : 'none';
     if(view==='list') renderList();
     if(view==='roster') renderRosterView();
+    if(view==='whosin') renderWhosInView();
   }
   document.getElementById('tab-map').onclick = function(){ showView('map'); };
   document.getElementById('tab-list').onclick = function(){ showView('list'); };
   document.getElementById('tab-roster').onclick = function(){ showView('roster'); };
+  document.getElementById('tab-whosin').onclick = function(){ showView('whosin'); };
   document.getElementById('search-input').addEventListener('input', function(){
     if(document.getElementById('list-view').classList.contains('active')) renderList();
   });
@@ -1374,6 +1539,8 @@
       weeklyPick = (v.weeklyPick && v.weeklyPick.code) ? v.weeklyPick : null;
       roster = v.roster || null;
       rosterHistoryList = Array.isArray(v.rosterHistory) ? v.rosterHistory : [];
+      whosInMembers = Array.isArray(v.whosInMembers) ? v.whosInMembers.filter(function(m){ return m && m.id && m.name; }) : [];
+      whosInResponses = v.whosIn || {};
       dbReady = true;
 
       setSync(true, 'Synced with the group');
@@ -1381,6 +1548,7 @@
       if(currentCode) renderPanel();
       if(!rosterEditing && editingHistoryId===null &&
          document.getElementById('roster-view').classList.contains('active')) renderRosterView();
+      if(!whosInEditing && document.getElementById('whosin-view').classList.contains('active')) renderWhosInView();
     }, function(){
       setSync(false, 'Sync interrupted \u2014 changes may not save');
     });
