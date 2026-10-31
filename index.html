@@ -668,7 +668,7 @@
     IE:{c:"Ireland",b:"Guinness",s:"Dry Stout",br:"Guinness",n:"Brewed at St. James's Gate since 1759 \u2014 the pour itself is basically a ritual."},
     DE:{c:"Germany",b:"Beck's",s:"Pilsner",br:"Beck's Brewery",n:"Brewed in Bremen since 1873, and one of Germany's best-known beer exports."},
     BE:{c:"Belgium",b:"Stella Artois",s:"Pilsner",br:"AB InBev",n:"Brewed in Leuven since 1926, and Belgium's biggest global beer export."},
-    NL:{c:"Netherlands",b:"Heineken",s:"Pale Lager",br:"Heineken",n:"That red star has been on Dutch beer since 1873, now sold in over 190 countries."},
+    NL:{c:"Netherlands",b:"Hollandia",s:"Pale Lager",br:"Swinkels Family Brewers",n:"A mild, easy-drinking Dutch pale lager from the Bavaria breweries."},
     FR:{c:"France",b:"Kronenbourg 1664",s:"Pale Lager",br:"Kronenbourg",n:"Alsace-brewed since 1664, and France's most exported beer."},
     ES:{c:"Spain",b:"Estrella Damm",s:"Pale Lager",br:"Damm",n:"Brewed in Barcelona since 1876, a Mediterranean-style lager and a staple of Catalan tapas bars."},
     PT:{c:"Portugal",b:"Super Bock",s:"Pale Lager",br:"Super Bock Group",n:"The stag's-head logo is everywhere \u2014 Portugal's favorite round."},
@@ -740,7 +740,7 @@
     PK:{c:"Pakistan",b:"Murree",s:"Lager",br:"Murree Brewery",n:"Founded in 1860, one of the oldest breweries in Asia, still brewing today."},
 
     AU:{c:"Australia",b:"Victoria Bitter",s:"Lager",br:"Carlton & United Breweries",n:"\u201cVB\u201d has been Australia's default counter beer since 1854."},
-    NZ:{c:"New Zealand",b:"Steinlager",s:"Lager",br:"Lion",n:"New Zealand's best-known international export since 1957."},
+    NZ:{c:"New Zealand",b:"Monteith's Black",s:"Dark Beer",br:"Monteith's",n:"A dark beer from Monteith's, brewed in Greymouth on New Zealand's West Coast."},
     FJ:{c:"Fiji",b:"Fiji Bitter",s:"Lager",br:"Carlton Brewery Fiji",n:"Brewed in Suva, and the beer most associated with a Fijian night out."},
     PG:{c:"Papua New Guinea",b:"SP Lager",s:"Pale Lager",br:"South Pacific Brewery",n:"Brewed since 1952 and universally known simply as \u201cSP.\u201d"}
   };
@@ -1359,7 +1359,7 @@
         '<div class="rot-last">'+lastTxt+'</div></div>';
     }).join('');
     return '<div class="roster-card"><h4>Rotation order</h4>'+rows+
-      '<div class="rot-note">Fewest turns first, then whoever brought longest ago. Newcomers start level with the group. Names are matched against Past rounds, so spell them the same way in both places.</div></div>';
+      '</div>';
   }
 
   function saveRoster(date, name1, name2){
@@ -1578,7 +1578,7 @@
         return '<button class="wi-opt'+(r===val?' on-'+val:'')+'" data-id="'+m.id+'" data-val="'+val+'" type="button">'+label+'</button>';
       }
       return '<div class="wi-row">'+
-        '<div class="wi-name">'+escapeHtml(m.name)+(bringing[normName(m.name)]?'<span class="wi-badge">\u{1F37A} Bringing</span>':'')+'</div>'+
+        '<div class="wi-name">'+escapeHtml(m.name)+(bringing[normName(m.name)]?'<span class="wi-badge" title="Bringing this week" aria-label="Bringing this week">\u{1F37A}</span>':'')+'</div>'+
         (whosInEditing
           ? '<div class="wi-opts">'+levelControlHtml(m, turnsByName)+'<button class="wi-remove" data-id="'+m.id+'" type="button" title="Remove" aria-label="Remove '+escapeHtml(m.name)+'">\u00d7</button></div>'
           : '<div class="wi-opts">'+opt('in','In')+opt('out','Out')+opt('unsure','Unsure')+'</div>')+
