@@ -1346,8 +1346,8 @@
     round.names.forEach(function(n){ bringing[normName(n)] = true; });
     var rows = order.map(function(o, i){
       var r = resp[o.m.id];
-      var tag = bringing[normName(o.m.name)] ? '<span class="wi-badge">\u{1F37A} Bringing</span>'
-        : (r==='out' ? '<span class="rot-tag">Out this week</span>' : (r==='unsure' ? '<span class="rot-tag">Unsure</span>' : ''));
+      var tag = bringing[normName(o.m.name)] ? '<span class="wi-badge">\u{1F37A} Beers</span>'
+        : (r==='out' ? '<span class="rot-tag">Out</span>' : (r==='unsure' ? '<span class="rot-tag">Unsure</span>' : ''));
       var turnsTxt = o.times + (o.times===1 ? ' turn' : ' turns');
       var lastTxt;
       if(o.last && o.last !== '0000-00-00') lastTxt = turnsTxt + ' \u00b7 last ' + formatRosterDate(o.last);
