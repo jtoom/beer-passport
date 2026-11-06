@@ -1109,8 +1109,8 @@
     }
     el.innerHTML = rows.map(function(r){
       var tintStyle = '';
-      if(r.tried && FLAG_COLORS[r.code]){
-        tintStyle = ' style="background:color-mix(in srgb, '+FLAG_COLORS[r.code]+' 16%, var(--card));"';
+      if(r.tried){
+        tintStyle = ' style="background:color-mix(in srgb, '+FLAG_COLORS.DE+' 16%, var(--card));"';
       }
       return '<div class="country-row'+(r.tried?' tried':'')+'" data-code="'+r.code+'"'+tintStyle+'>'+
         '<div class="flag">'+flagEmoji(r.code)+'</div>'+
